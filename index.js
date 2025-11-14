@@ -58,9 +58,6 @@ const prepareForDatabase = (transaction, budgetAccount) => {
    return _transaction;
 }
 
-// backward-compat alias (falls anderes Modul noch alten Namen nutzt)
-const preperaForDatebase = prepareForDatabase;
-
 const main = async () => {
    const fintsClient = new FinTSClient();
    // FinTSClient intern ruft async-methoden im ctor — explizit initialisieren und Accounts laden
