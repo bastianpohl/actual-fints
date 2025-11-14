@@ -1,0 +1,27 @@
+{
+  "name": "fints-to-actual",
+  "version": "0.0.1",
+  "description": "Nodejs Script to load FinTS Transactions and upload them to Actual Budget",
+  "keywords": [
+    "actual",
+    "budget",
+    "fints"
+  ],
+  "license": "ISC",
+  "author": "Bastian Pohl",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "debug": "node --env-file=.env index.js",
+    "start": "node --env-file=.env index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@actual-app/api": "^25.11.0",
+    "fints": "^0.5.0"
+  },
+  "overrides": {
+    "node-fetch": "^2.6.7",
+    "fast-xml-parser": "^4.1.2"
+  }
+}

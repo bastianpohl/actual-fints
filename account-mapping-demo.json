@@ -1,0 +1,14 @@
+[
+  {
+    "iban": "DE60100100101234567890",
+    "actualBudgetAccountName": "Girokonto Privat"
+  },
+  {
+    "iban": "DE11500105170648489890",
+    "actualBudgetAccountName": "Tagesgeld Rücklagen"
+  },
+  {
+    "iban": "DE45500905001234567892",
+    "actualBudgetAccountName": "Geschäftskonto"
+  }
+]
