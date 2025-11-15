@@ -1,4 +1,4 @@
-# Actual‑FinTS Connector — README
+# Actual‑FinTS Connector
 
 ## Kurzbeschreibung
 - Dieses Skript verbindet ein deutsches Bankkonto per FinTS mit der App ActualBudget.
@@ -21,23 +21,30 @@ Die aktuelle Version des Skripts supportet nur eine Fints-Account.
 Über Umgebungsvariablen oder eine lokale Konfigurationsdatei (z. B. `.env`).
    
 **FINTS_URL**:   
-URL des FinTS Server der Bank
+URL des FinTS Server der Bank 
+
 **FINTS_LOGIN:**
 User / Login beim Onlinebanking
+
 **FINTS_PIN:**   
 Passwort / Pin zum Onlinebanking
+
 **FINTS_BLZ:**   
 Bankleitzahl der Bank  
 
 ### ActualBudget 
-**AB_URL:**
-des ActualBudget Servers
+**AB_URL:** 
+URL des ActualBudget Servers
+
 **AB_PASS:**
 Passwort der ActualBudget Servers
+
 **AB_SYNC_DB:**
 Sync ID der Datei
+
 **AB_PATH:**
 Pfad des Ordners, in dem die sqlite-DB gespeichert wird
+
 **Mappingdatei:** 
 Mapping-Datei um die Bankkonten aus dem Onlinebanking mit den ActucalBudget zu matchen 
 
