@@ -24,7 +24,7 @@ const textDataforDB = (descriptionStructured = {}, customerReference = '', bankR
    const parts = [];
 
    // priorisiere referenz-Text, dann freie Felder, dann ids
-   if (reference?.text) parts.push(reference.text);
+   if (reference?.text) parts.push(reference.text.trim());
    if (text) parts.push(`#${text}`);
    if (iban) parts.push(`IBAN: ${iban}`);
    if (bic) parts.push(`BIC: ${bic}`);
