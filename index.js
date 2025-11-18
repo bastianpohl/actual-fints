@@ -88,7 +88,7 @@ const main = async () => {
          fintsClient.setAccount(matchedAccount.iban);
          await budgetClient.setActiveAccount(matchedAccount.actualBudgetAccountName);
 
-         const transactions = await fintsClient.getTransaktions(new Date("2025-10-27"), new Date());
+         const transactions = await fintsClient.getTransaktions(new Date(), new Date());
          if (!transactions || transactions.length === 0) {
             console.log('Keine Transaktionen für', matchedAccount.iban);
             continue;
