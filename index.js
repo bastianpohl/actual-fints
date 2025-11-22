@@ -8,20 +8,25 @@ const convertAmountForDB = (amount, isCredit) => {
    return Math.round(amount * 100 * factor);
 }
 
-const textDataforDB = (descriptionStructured = {}, customerReference = '', bankReference = '') => {
+const decodeText = text =>
+  typeof text === 'string'
+    ? Buffer.from(text, 'latin1').toString('utf8').trim()
+    : '';
+
+const getNotes = (transaction) => {
    const {
-      name = '',
       reference = {},
       iban = descriptionStructured.iban || descriptionStructured.iabn || '',
       bic = '',
       text = ''
-   } = descriptionStructured || {};
+   } = transaction.descriptionStructured || {};
 
    const parts = [];
 
+   
    // priorisiere referenz-Text, dann freie Felder, dann ids
-   if (reference?.text) parts.push(reference.text.trim());
-   if (text) parts.push(`#${text}`);
+   if (reference?.text) parts.push(decodeText(reference.text));
+   if (text) parts.push(`#${decodeText(text)}`);
    if (iban) parts.push(`IBAN: ${iban}`);
    if (bic) parts.push(`BIC: ${bic}`);
 
@@ -29,30 +34,27 @@ const textDataforDB = (descriptionStructured = {}, customerReference = '', bankR
    if (reference?.mandateRef) parts.push(`MD: ${reference.mandateRef}`);
    if (reference?.creditorId) parts.push(`CID: ${reference.creditorId}`);
 
-   if (customerReference) parts.push(`CR: ${customerReference}`);
-   if (bankReference) parts.push(`BR: ${bankReference}`);
+   if (transaction.customerReference) parts.push(`CR: ${transaction.customerReference}`);
+   if (transaction.bankReference) parts.push(`BR: ${transaction.bankReference}`);
 
    const notes = parts.join(' ').replace(/\s+/g, ' ');
 
    // optional: begrenze Länge, damit DB-Felder nicht überlaufen
    const MAX_NOTE_LENGTH = 2000;
-   return { name: (name || ''), notes: notes.slice(0, MAX_NOTE_LENGTH) };
-}
+   return notes.slice(0, MAX_NOTE_LENGTH)
+};
 
-const prepareForDatabase = (transaction, budgetAccount) => {
-   const _transaction = {
+const getPayeeName = (transaction) => transaction.descriptionStructured.name || '';  
+
+const convertTransaction = (transaction, budgetAccount) => {
+   return {
       account: budgetAccount,
       amount: convertAmountForDB(transaction.amount, transaction.isCredit),
       date: transaction.entryDate,
-      imported_id: transaction.id
+      imported_id: transaction.id,
+      payee_name: getPayeeName(transaction),
+      notes: getNotes(transaction)
    };
-
-   const { name, notes } = textDataforDB(transaction.descriptionStructured, transaction.customerReference, transaction.bankReference);
-
-   _transaction.payee_name = name;
-   _transaction.notes = notes;
-
-   return _transaction;
 }
 
 const main = async () => {
@@ -93,7 +95,7 @@ const main = async () => {
             continue;
          }
 
-         const budgetTransactions = transactions.map(async t => prepareForDatabase(t, await budgetClient.getActiveAccountId()));
+         const budgetTransactions = transactions.map(async t => convertTransaction(t, await budgetClient.getActiveAccountId()));
 
          if (budgetTransactions.length > 0) {
             await budgetClient.importTransactions(budgetTransactions);
