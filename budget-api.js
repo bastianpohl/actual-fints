@@ -1,4 +1,6 @@
 const api = require('@actual-app/api');
+const isUid = require('./utils/uid');
+const { convertTransaction } = require('./utils/convert');
 
 class BudgetClient {
    #accounts;
@@ -40,14 +42,22 @@ class BudgetClient {
       return [...this.#accounts];
    }
 
-   async setActiveAccount(name) {
+   async setActiveAccount(input) {
       if (!this.#accounts.length) throw new Error("No accounts loaded");
-      if (!name) {
+      if (!input) {
          this.#activeAccount = this.#accounts[0];
          return;
       }
-      const id = await api.getIDByName('accounts', name);
-      if (!id) throw new Error(`Account with name "${name}" not found`);
+
+      if (isUid(input)) {
+         const matched = this.#accounts.find(a => a.id === input);
+         if (!matched) throw new Error(`Account with ID "${input}" not found`);
+         this.#activeAccount = matched.id;
+         return;
+      }
+
+      const id = await api.getIDByName('accounts', input);
+      if (!id) throw new Error(`Account with name "${input}" not found`);
       this.#activeAccount = id;
    }
 
@@ -73,6 +83,18 @@ class BudgetClient {
          this.#initialized = false;
       }
    }
+
+   convert = (transaction) => {
+      if (!this.#activeAccount) throw new Error("No active account id set");
+      if (!transaction || typeof transaction !== 'object') {
+         throw new Error("Invalid transaction object");
+      }
+
+      return convertTransaction(transaction, this.#activeAccount);
+   }
 }
 
-module.exports =  { BudgetClient }
+
+
+
+module.exports = { BudgetClient };

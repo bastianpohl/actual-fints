@@ -12,9 +12,9 @@ coverage/
 dist/
 tmp/
 .vscode/
-
 .cache/
 actual-sync/
 actual-budget/
 account-mapping.json
 *.code-workspace
+*launch.json

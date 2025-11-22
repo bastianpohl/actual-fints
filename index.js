@@ -1,61 +1,7 @@
 const { FinTSClient } = require('./fints-api');
-const { BudgetClient } = require('./budget-api')
+const { BudgetClient } = require('./budget-api');
 
 const accountData = require(process.env.MAPPING_FILE || './account-mapping.json');
-
-const convertAmountForDB = (amount, isCredit) => {
-   let factor = isCredit ? 1 : -1;
-   return Math.round(amount * 100 * factor);
-}
-
-const decodeText = text =>
-  typeof text === 'string'
-    ? Buffer.from(text, 'latin1').toString('utf8').trim()
-    : '';
-
-const getNotes = (transaction) => {
-   const descriptionStructured = transaction.descriptionStructured || {};
-   const {
-      reference = {},
-      iban = descriptionStructured.iban || descriptionStructured.iabn || '',
-      bic = '',
-      text = ''
-   } = descriptionStructured;
-
-   const parts = [];
-   
-   // priorisiere referenz-Text, dann freie Felder, dann ids
-   if (reference?.text) parts.push(decodeText(reference.text));
-   if (text) parts.push(`#${decodeText(text)}`);
-   if (iban) parts.push(`IBAN: ${iban}`);
-   if (bic) parts.push(`BIC: ${bic}`);
-
-   if (reference?.endToEndRef) parts.push(`E2E: ${reference.endToEndRef}`);
-   if (reference?.mandateRef) parts.push(`MD: ${reference.mandateRef}`);
-   if (reference?.creditorId) parts.push(`CID: ${reference.creditorId}`);
-
-   if (transaction.customerReference) parts.push(`CR: ${transaction.customerReference}`);
-   if (transaction.bankReference) parts.push(`BR: ${transaction.bankReference}`);
-
-   const notes = parts.join(' ').replace(/\s+/g, ' ');
-
-   // optional: begrenze Länge, damit DB-Felder nicht überlaufen
-   const MAX_NOTE_LENGTH = 2000;
-   return notes.slice(0, MAX_NOTE_LENGTH);
-};
-
-const getPayeeName = (transaction) => transaction?.descriptionStructured?.name || '';
-
-const convertTransaction = (transaction, budgetAccount) => {
-   return {
-      account: budgetAccount,
-      amount: convertAmountForDB(transaction.amount, transaction.isCredit),
-      date: transaction.entryDate,
-      imported_id: transaction.id,
-      payee_name: getPayeeName(transaction),
-      notes: getNotes(transaction)
-   };
-}
 
 const main = async () => {
    
@@ -96,7 +42,7 @@ const main = async () => {
             continue;
          }
 
-         const budgetTransactions = transactions.map(async t => convertTransaction(t, await budgetClient.getActiveAccountId()));
+         const budgetTransactions = transactions.map(t => BudgetClient.convert(t));
 
          if (budgetTransactions.length > 0) {
             await budgetClient.importTransactions(budgetTransactions);
@@ -115,13 +61,3 @@ if (require.main === module) {
       console.error('Unhandled error in main:', err);
    });
 }
-
-module.exports = {
-   convertAmountForDB,
-   decodeText,
-   getNotes,
-   getPayeeName,
-   convertTransaction,
-   main,
-};
-
