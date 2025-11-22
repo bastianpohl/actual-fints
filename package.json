@@ -14,7 +14,7 @@
   "scripts": {
     "debug": "node --env-file=.env index.js",
     "start": "node --env-file=.env index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test"
   },
   "dependencies": {
     "@actual-app/api": "^25.11.0",
@@ -23,8 +23,5 @@
   "overrides": {
     "node-fetch": "^2.6.7",
     "fast-xml-parser": "^4.1.2"
-  },
-  "devDependencies": {
-    "jest": "^30.2.0"
   }
 }
