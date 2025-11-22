@@ -4,7 +4,7 @@ const { BudgetClient } = require('./budget-api');
 const accountData = require(process.env.MAPPING_FILE || './account-mapping.json');
 
 const main = async () => {
-   
+
    const fintsClient = new FinTSClient();
    // FinTSClient intern ruft async-methoden im ctor — explizit initialisieren und Accounts laden
    if (typeof fintsClient.initiateClient === 'function') {
@@ -15,7 +15,7 @@ const main = async () => {
    }
 
    const budgetClient = new BudgetClient();
-   await budgetClient.loadBudget(); 
+   await budgetClient.loadBudget();
    await budgetClient.getAccounts();
 
    const fintsAccounts = fintsClient.getAccounts();
@@ -36,20 +36,22 @@ const main = async () => {
          fintsClient.setAccount(matchedAccount.iban);
          await budgetClient.setActiveAccount(matchedAccount.actualBudgetAccountName);
 
+
          const transactions = await fintsClient.getTransaktions(new Date(), new Date());
+         
+
          if (!transactions || transactions.length === 0) {
             console.log('Keine Transaktionen für', matchedAccount.iban);
             continue;
          }
 
-         const budgetTransactions = transactions.map(t => BudgetClient.convert(t));
+         const budgetTransactions = transactions.map(t => budgetClient.convert(t));
 
          if (budgetTransactions.length > 0) {
             await budgetClient.importTransactions(budgetTransactions);
          }
       } catch (err) {
          console.error('Fehler beim Verarbeiten von Konto', fintsAccount?.iban, err);
-         // optional: continue oder rethrow je nach gewünschtem Verhalten
       }
    }
 
