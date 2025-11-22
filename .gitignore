@@ -12,6 +12,7 @@ coverage/
 dist/
 tmp/
 .vscode/
+
 .cache/
 actual-sync/
 actual-budget/

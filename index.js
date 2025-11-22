@@ -14,15 +14,15 @@ const decodeText = text =>
     : '';
 
 const getNotes = (transaction) => {
+   const descriptionStructured = transaction.descriptionStructured || {};
    const {
       reference = {},
       iban = descriptionStructured.iban || descriptionStructured.iabn || '',
       bic = '',
       text = ''
-   } = transaction.descriptionStructured || {};
+   } = descriptionStructured;
 
    const parts = [];
-
    
    // priorisiere referenz-Text, dann freie Felder, dann ids
    if (reference?.text) parts.push(decodeText(reference.text));
@@ -41,10 +41,10 @@ const getNotes = (transaction) => {
 
    // optional: begrenze Länge, damit DB-Felder nicht überlaufen
    const MAX_NOTE_LENGTH = 2000;
-   return notes.slice(0, MAX_NOTE_LENGTH)
+   return notes.slice(0, MAX_NOTE_LENGTH);
 };
 
-const getPayeeName = (transaction) => transaction.descriptionStructured.name || '';  
+const getPayeeName = (transaction) => transaction?.descriptionStructured?.name || '';
 
 const convertTransaction = (transaction, budgetAccount) => {
    return {
@@ -58,6 +58,7 @@ const convertTransaction = (transaction, budgetAccount) => {
 }
 
 const main = async () => {
+   
    const fintsClient = new FinTSClient();
    // FinTSClient intern ruft async-methoden im ctor — explizit initialisieren und Accounts laden
    if (typeof fintsClient.initiateClient === 'function') {
@@ -109,6 +110,18 @@ const main = async () => {
    await budgetClient.close();
 }
 
-main().catch(err => {
-   console.error('Unhandled error in main:', err);
-});
+if (require.main === module) {
+   main().catch(err => {
+      console.error('Unhandled error in main:', err);
+   });
+}
+
+module.exports = {
+   convertAmountForDB,
+   decodeText,
+   getNotes,
+   getPayeeName,
+   convertTransaction,
+   main,
+};
+
