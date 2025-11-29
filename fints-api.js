@@ -1,4 +1,5 @@
 const { PinTanClient } = require('fints');
+const { requireEnv } = require('./utils/env');
 
 
 class FinTSClient {
@@ -7,20 +8,36 @@ class FinTSClient {
    #client;
    #activeAccount;
 
+   #fintsUrl;
+   #fintsLogin;
+   #fintsPin;
+   #fintsBlz;
+
    constructor() {
       this.#client = null;
       this.#activeAccount = null;
       this.#accounts = [];
    }
 
+   #loadCredentials() {
+      const env = requireEnv(['FINTS_URL', 'FINTS_LOGIN', 'FINTS_PIN', 'FINTS_BLZ']);
+      this.#fintsUrl = env.FINTS_URL;
+      this.#fintsLogin = env.FINTS_LOGIN;
+      this.#fintsPin = env.FINTS_PIN;
+      this.#fintsBlz = env.FINTS_BLZ;
+   }
+
    async initiateClient() {
       try {
          if (this.#client) return;
+
+         this.#loadCredentials();
+
          this.#client = new PinTanClient({
-            url: process.env.FINTS_URL,
-            name: process.env.FINTS_LOGIN,
-            pin: process.env.FINTS_PIN,
-            blz: process.env.FINTS_BLZ,
+            url: this.#fintsUrl,
+            name: this.#fintsLogin,
+            pin: this.#fintsPin,
+            blz: this.#fintsBlz,
          });
          console.log("FinTS client created");
       } catch (error) {

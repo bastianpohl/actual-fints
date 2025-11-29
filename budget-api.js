@@ -1,45 +1,72 @@
 const api = require('@actual-app/api');
 const { isUid } = require('./utils/uid');
 const { convertTransaction } = require('./utils/convert');
+const { requireEnv } = require('./utils/env');
 
 class BudgetClient {
    #accounts;
    #activeAccount;
    #initialized = false;
 
+   #AB_URL = null;
+   #AB_PASS = null;
+   #AB_PATH = null;
+   #AB_SYNC_DB = null;
+
    constructor() {
       this.#activeAccount = null;
       this.#accounts = [];
    }
 
-   static #requireEnv(keys) {
-      const missing = keys.filter(k => !process.env[k]);
-      if (missing.length) throw new Error(`Missing Actual env vars: ${missing.join(', ')}`);
+   #loadCredentials() {
+      const env = requireEnv(['AB_URL', 'AB_PASS', 'AB_PATH', 'AB_SYNC_DB']);
+      this.#AB_URL = env.AB_URL;
+      this.#AB_PASS = env.AB_PASS;
+      this.#AB_PATH = env.AB_PATH;
+      this.#AB_SYNC_DB = env.AB_SYNC_DB;
    }
 
    async #initClient() {
       if (this.#initialized) return;
-      BudgetClient.#requireEnv(['AB_URL', 'AB_PASS', 'AB_PATH']);
-      await api.init({
-         serverURL: process.env.AB_URL,
-         password: process.env.AB_PASS,
-         dataDir: process.env.AB_PATH 
-      });
-      this.#initialized = true;
-      console.log('API initialized successfully');
+
+      try {
+         this.#loadCredentials();
+
+         await api.init({
+            serverURL: this.#AB_URL,
+            password: this.#AB_PASS,
+            dataDir: this.#AB_PATH
+         });
+
+      } catch (error) {
+         throw new Error(`Failed to initialize API client: ${error.message}`);
+      } finally {
+         this.#initialized = true;
+         console.log('API initialized successfully');
+      }
    }
 
    async loadBudget() {
       await this.#initClient();
-      BudgetClient.#requireEnv(['AB_SYNC_DB']);
-      await api.downloadBudget(process.env.AB_SYNC_DB);
-      console.log('Budget downloaded successfully');
+
+      try {
+         await api.downloadBudget(this.#AB_SYNC_DB);
+      } catch (error) {
+         throw new Error(`Failed to load budget: ${error.message}`);
+      } finally {
+         console.log('Budget downloaded successfully');
+      }
+
    }
 
    async getAccounts() {
       await this.#initClient();
-      this.#accounts = await api.getAccounts();
-      return [...this.#accounts];
+      try {
+         this.#accounts = await api.getAccounts();
+         return [...this.#accounts];
+      } catch (error) {
+         throw new Error(`Failed to retrieve accounts: ${error.message}`);
+      }     
    }
 
    async setActiveAccount(input) {
@@ -65,7 +92,7 @@ class BudgetClient {
       return this.#activeAccount;
    }
 
-   convert(transaction){
+   convert(transaction) {
       if (!this.#activeAccount) throw new Error("No active account id set");
       if (!transaction || typeof transaction !== 'object') {
          throw new Error("Invalid transaction object");

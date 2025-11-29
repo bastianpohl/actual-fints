@@ -4,6 +4,7 @@ const assert = require('assert/strict');
 const { decodeText } = require('../utils/decodeText');
 const { isUid } = require('../utils/uid')
 const { convertAmount, getNotes, getPayeeName, convertTransaction } = require ('../utils/convert');
+const { requireEnv } = require('../utils/env');
 
 
 test('convertAmount gibt positiven Wert bei Kredit zurück', () => {
@@ -104,4 +105,30 @@ test('erkennt UID von ActualBudget', () => {
 
 test('Haushaltskonto ist keine UID', () => {
   assert.equal(isUid(' Haushaltskonto'), false);
+});
+
+test('requireEnv wirft Fehler, wenn kein Array übergeben wird', () => {
+  assert.throws(
+    () => requireEnv('AB_URL'),
+    /Keys must be an array/
+  );
+});
+
+test('requireEnv wirft Fehler, wenn Variablen fehlen', () => {
+  assert.throws(
+    () => requireEnv(['NOT_SET']),
+    /Missing Actual env vars: NOT_SET/
+  );
+});
+
+test('requireEnv liefert Objekt mit vorhandenen Variablen', () => {
+  process.env.TEST_URL = 'http://localhost';
+  process.env.TEST_PASS = 'secret';
+
+  const env = requireEnv(['TEST_URL', 'TEST_PASS']);
+
+  assert.deepEqual(env, {
+    TEST_URL: 'http://localhost',
+    TEST_PASS: 'secret',
+  });
 });
