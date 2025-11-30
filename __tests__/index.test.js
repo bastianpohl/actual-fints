@@ -7,27 +7,27 @@ const { convertAmount, getNotes, getPayeeName, convertTransaction } = require ('
 const { requireEnv } = require('../utils/env');
 
 
-test('convertAmount gibt positiven Wert bei Kredit zurück', () => {
+test('convertAmount returns positive value for credit', () => {
   assert.equal(convertAmount(12.345, true), 1235);
 });
 
-test('convertAmount gibt negativen Wert bei Debit zurück', () => {
+test('convertAmount returns negative value for debit', () => {
   assert.equal(convertAmount(99.99, false), -9999);
 });
 
-test('decodeText dekodiert Latin-1 nach UTF-8', () => {
+test('decodeText decodes Latin-1 to UTF-8', () => {
   assert.equal(decodeText('Ãberweisung'), 'Überweisung');
 });
 
-test('Überweisung bleibt Überweisung', () => {
+test('Überweisung remains Überweisung', () => {
   assert.equal(decodeText('Überweisung'), 'Überweisung');
 });
 
-test('decodeText gibt leeren String für Nicht-Strings zurück', () => {
+test('decodeText returns empty string for non-strings', () => {
   assert.equal(decodeText(null), '');
 });
 
-test('getNotes baut strukturierte Felder zu Notizen zusammen', () => {
+test('getNotes composes structured fields into notes', () => {
   const transaction = {
     descriptionStructured: {
       reference: { text: 'Ãberweisung', endToEndRef: 'E2E123' },
@@ -45,19 +45,19 @@ test('getNotes baut strukturierte Felder zu Notizen zusammen', () => {
   assert.equal(getNotes(transaction), expected);
 });
 
-test('getNotes toleriert fehlende Felder', () => {
+test('getNotes tolerates missing fields', () => {
   assert.equal(getNotes({ descriptionStructured: {} }), '');
 });
 
-test('getPayeeName liefert Namen aus descriptionStructured', () => {
+test('getPayeeName returns name from descriptionStructured', () => {
   assert.equal(getPayeeName({ descriptionStructured: { name: 'Müller GmbH' } }), 'Müller GmbH');
 });
 
-test('getPayeeName gibt leeren String zurück, wenn kein Name vorhanden', () => {
+test('getPayeeName returns empty string when no name present', () => {
   assert.equal(getPayeeName({}), '');
 });
 
-test('convertTransaction konvertiert Transaktion vollständig', () => {
+test('convertTransaction fully converts the transaction', () => {
   const t = {
     amount: 10.5,
     isCredit: false,
@@ -82,46 +82,46 @@ test('convertTransaction konvertiert Transaktion vollständig', () => {
 });
 
 
-test('isUid erkennt gültige numerische IDs', () => {
+test('isUid recognizes valid numeric IDs', () => {
   assert.equal(isUid(123456), true);
   assert.equal(isUid('789012'), true);
 });
 
-test('isUid erkennt gültige hexadezimale UUIDs', () => {
+test('isUid recognizes valid hexadecimal UUIDs', () => {
   assert.equal(isUid('550e8400e29b41d4a716446655440000'), true);
   assert.equal(isUid('550e8400-e29b-41d4-a716-446655440000'), true);
 });
 
-test('isUid erkennt ungültige IDs', () => {
+test('isUid recognizes invalid IDs', () => {
   assert.equal(isUid('not-a-uid'), false);
   assert.equal(isUid(null), false);
   assert.equal(isUid(undefined), false);
   assert.equal(isUid(''), false);
 });
 
-test('erkennt UID von ActualBudget', () => {
+test('recognizes ActualBudget UID', () => {
   assert.equal(isUid(' 52c9f3ee-3335-4be5-a84d-78eabab3286a'), true);
 });
 
-test('Haushaltskonto ist keine UID', () => {
+test('Haushaltskonto is not a UID', () => {
   assert.equal(isUid(' Haushaltskonto'), false);
 });
 
-test('requireEnv wirft Fehler, wenn kein Array übergeben wird', () => {
+test('requireEnv throws error when no array is provided', () => {
   assert.throws(
     () => requireEnv('AB_URL'),
     /Keys must be an array/
   );
 });
 
-test('requireEnv wirft Fehler, wenn Variablen fehlen', () => {
+test('requireEnv throws error when variables are missing', () => {
   assert.throws(
     () => requireEnv(['NOT_SET']),
     /Missing Actual env vars: NOT_SET/
   );
 });
 
-test('requireEnv liefert Objekt mit vorhandenen Variablen', () => {
+test('requireEnv returns object with existing variables', () => {
   process.env.TEST_URL = 'http://localhost';
   process.env.TEST_PASS = 'secret';
 
@@ -132,3 +132,4 @@ test('requireEnv liefert Objekt mit vorhandenen Variablen', () => {
     TEST_PASS: 'secret',
   });
 });
+

@@ -1,90 +1,89 @@
 # Actual‑FinTS Connector
 
-## Kurzbeschreibung
-- Dieses Skript verbindet ein deutsches Bankkonto per FinTS mit der App ActualBudget.
-- Ziel: Kontostände und Umsätze aus FinTS abrufen und so aufbereiten, dass [ActualBudget](https://actualbudget.org) sie einem vorhandenen Konto zuordnen kann.
+## Short Overview
+- This script connects a German bank account via FinTS with the ActualBudget app.
+- Goal: fetch balances and transactions from FinTS and prepare them so that [ActualBudget](https://actualbudget.org) can assign them to an existing account.
 
-## Abhängigkeiten
-Das Skript verwendet das NPM Package [Fints](https://www.npmjs.com/package/fints) zum Abruf der Umsätze über die Fints/HBCI-Schnittstelle der Bank.
+## Dependencies
+The script uses the NPM package [Fints](https://www.npmjs.com/package/fints) to retrieve transactions via the bank’s FinTS/HBCI interface.
 
->  15.11.2025: das Package ist recht alt und wurde vor 5 Jahren des letzte Mal aktualisiert. Ebenso findet aktuell eine Umstellung der Banken auf das XML-basierte Camt-Format statt. Breaking Changes sind theoretisch möglich
+> 2025-11-15: this package is quite old and was last updated 5 years ago. Banks are currently migrating to the XML-based Camt format. Breaking changes are theoretically possible.
 
-Für die Kommunikation mit einem ActucalBduget-Server wird die offizielle [API](https://actualbudget.org/docs/api/) von ActualBudget genutzt
+For communication with an ActualBudget server, the official [API](https://actualbudget.org/docs/api/) provided by ActualBudget is used.
 
-## Einschränkung
-Die verwendete Package zur FinTS-Kommunikation liefert  vorgemerkte Buchungen. 
+## Limitation
+The FinTS package used returns pending bookings.
 
-Die aktuelle Version des Skripts supportet nur eine Fints-Account.
+The current version of the script supports only a single FinTS account.
 
-## Konfiguration
-### FinTS‑Zugang
-Über Umgebungsvariablen oder eine lokale Konfigurationsdatei (z. B. `.env`).
-   
-**FINTS_URL**:   
-URL des FinTS Server der Bank 
+## Configuration
+### FinTS Access
+Via environment variables or a local configuration file (e.g., `.env`).
 
-**FINTS_LOGIN:**
-User / Login beim Onlinebanking
+**FINTS_URL:**  
+URL of the bank’s FinTS server
 
-**FINTS_PIN:**   
-Passwort / Pin zum Onlinebanking
+**FINTS_LOGIN:**  
+User/login for online banking
 
-**FINTS_BLZ:**   
-Bankleitzahl der Bank  
+**FINTS_PIN:**  
+Password/PIN for online banking
 
-### ActualBudget 
-**AB_URL:** 
-URL des ActualBudget Servers
+**FINTS_BLZ:**  
+Bank code (BLZ)
 
-**AB_PASS:**
-Passwort der ActualBudget Servers
+### ActualBudget
+**AB_URL:**  
+URL of the ActualBudget server
 
-**AB_SYNC_DB:**
-Sync ID der Datei
+**AB_PASS:**  
+Password of the ActualBudget server
 
-**AB_PATH:**
-Pfad des Ordners, in dem die sqlite-DB gespeichert wird
+**AB_SYNC_DB:**  
+Sync ID of the file
 
-**Mappingdatei:** 
-Mapping-Datei um die Bankkonten aus dem Onlinebanking mit den ActucalBudget zu matchen 
+**AB_PATH:**  
+Path of the folder where the SQLite DB is stored
 
-### Mapping (wichtig)
-- Zweck: Das Script braucht Zuordnungen zwischen IBANs (Bankkonten) und den Kontonamen, die in ActualBudget existieren.
-- Datei: `mapping-data.json`
-- Format (Beispiel):
+**Mapping file:**  
+Mapping file to match bank accounts from online banking to ActualBudget accounts
+
+### Mapping (important)
+- Purpose: The script needs mappings between IBANs (bank accounts) and the account names that exist in ActualBudget.
+- File: `mapping-data.json`
+- Format (example):
 ```json
- [
+[
    {
       "iban": "DE12500105170648489890",
-      "actualBudgetAccount": "Girokonto / Bank X",
+      "actualBudgetAccount": "Girokonto / Bank X"
    },
    {
       "iban": "DE44500105175412345678",
-      "actualBudgetAccount": "Sparkonto / Bank X",
+      "actualBudgetAccount": "Sparkonto / Bank X"
    }
 ]
-
 ```
-**Regeln:**
-   - IBANs müssen normalisiert sein (keine Leerzeichen, Großbuchstaben). Beispiel: "DE12500105170648489890".
-   - `actualBudgetAccount` muss exakt dem Kontonamen in ActualBudget entsprechen. Die Zuordnung erfolgt per String‑Vergleich.
-   - Wenn keine passende Mapping‑Zeile gefunden wird, wird der Datensatz entweder verworfen oder in eine Fehlerdatei geschrieben (je nach Script‑Konfiguration).
 
+**Rules:**
+- IBANs must be normalized (no spaces, uppercase). Example: "DE12500105170648489890".
+- `actualBudgetAccount` must exactly match the account name in ActualBudget. Matching is done via string comparison.
+- If no matching mapping entry is found, the dataset is either discarded or written to an error file (depending on script configuration).
 
-### Fehlerbehandlung / Hinweise
-- Prüfe zuerst, dass die `actualBudgetAccount`‑Namen exakt mit den Konten in ActualBudget übereinstimmen (inkl. Sonderzeichen).
-- IBAN‑Formatierung ist kritisch: beim Abgleich werden Leerzeichen entfernt und Großschreibung erwartet.
-- Bei Konten mit mehreren Unterkonten oder geteilten Kontonamen: lege für jedes tatsächliche Konto eine eigene Mapping‑Zeile an.
-- Logs prüfen: fehlende Mappings, abgelehnte Transaktionen oder Verbindungsprobleme werden dort protokolliert.
+### Error Handling / Notes
+- First verify that the `actualBudgetAccount` names exactly match the accounts in ActualBudget (including special characters).
+- IBAN formatting is critical: during matching, spaces are removed and uppercase is expected.
+- For accounts with multiple subaccounts or split account names: create a mapping entry for each actual account.
+- Check logs: missing mappings, rejected transactions, or connection issues are logged there.
 
-## Hinweis: Node.js‑Implementierung
-- Dieses Projekt ist in Node.js implementiert. 
+## Note: Node.js Implementation
+- This project is implemented in Node.js.
 
-### Voraussetzungen
-- Node.js 16+ (oder LTS, z. B. 18). 
-- Abhängigkeiten in package.json.
+### Requirements
+- Node.js 16+ (or LTS, e.g., 18).
+- Dependencies listed in `package.json`.
 
-### Installation 
+### Installation
 ```bash
 git clone <repo>
 cd actual-fints

@@ -102,7 +102,7 @@ class BudgetClient {
    }
 
    async importTransactions(transactions) {
-      if (!Array.isArray(transactions) || !transactions.length) return;
+      if (!Array.isArray(transactions) || !transactions.length) return "No transactions to import";
       if (!this.#activeAccount) throw new Error("No active account id set");
       // Resolve any pending promises in the transactions array (works for plain values too)
       const resolvedTransactions = await Promise.all(transactions);
@@ -120,8 +120,5 @@ class BudgetClient {
       }
    }
 }
-
-
-
 
 module.exports = { BudgetClient };
