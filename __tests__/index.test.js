@@ -96,6 +96,20 @@ test('parseDateRange uses explicit --from and --to arguments when provided', t =
   assert.equal(endDate.toISOString(), new Date('2025-01-31').toISOString());
 });
 
+test('parseDateRange still honors legacy --start/--end flags', t => {
+  const originalArgv = process.argv;
+  process.argv = ['node', 'script', '--start', '2025-03-01', '--end', '2025-03-15'];
+
+  t.after(() => {
+    process.argv = originalArgv;
+  });
+
+  const { startDate, endDate } = parseDateRange();
+
+  assert.equal(startDate.toISOString(), new Date('2025-03-01').toISOString());
+  assert.equal(endDate.toISOString(), new Date('2025-03-15').toISOString());
+});
+
 test('parseDateRange defaults to the current date when arguments are missing', t => {
   const defaultDate = new Date();
 
