@@ -1,5 +1,5 @@
-const { FinTSClient } = require('./fints-api');
-const { BudgetClient } = require('./budget-api');
+const { FinTSClient } = require('./lib/fints-api');
+const { BudgetClient } = require('./lib/udget-api');
 
 const accountData = require(process.env.MAPPING_FILE || './account-mapping.json');
 const parseDateRange = require('./utils/parseDateRange');
