@@ -5,6 +5,7 @@ const { decodeText } = require('../utils/decodeText');
 const { isUid } = require('../utils/uid')
 const { convertAmount, getNotes, getPayeeName, convertTransaction } = require ('../utils/convert');
 const { requireEnv } = require('../utils/env');
+const parseDateRange = require('../utils/parseDateRange');
 
 
 test('convertAmount returns positive value for credit', () => {
@@ -81,6 +82,39 @@ test('convertTransaction fully converts the transaction', () => {
   });
 });
 
+test('parseDateRange uses explicit --from and --to arguments when provided', t => {
+  const originalArgv = process.argv;
+  process.argv = ['node', 'script', '--from', '2025-01-01', '--to', '2025-01-31'];
+
+  t.after(() => {
+    process.argv = originalArgv;
+  });
+
+  const { startDate, endDate } = parseDateRange();
+
+  assert.equal(startDate.toISOString(), new Date('2025-01-01').toISOString());
+  assert.equal(endDate.toISOString(), new Date('2025-01-31').toISOString());
+});
+
+test('parseDateRange defaults to the current date when arguments are missing', t => {
+  const defaultDate = new Date();
+
+  const { startDate, endDate } = parseDateRange();
+
+  assert.equal(startDate.toISOString(), defaultDate.toISOString());
+  assert.equal(endDate.toISOString(), defaultDate.toISOString());
+});
+
+test('parseDateRange throws when end date precedes start date', t => {
+  const originalArgv = process.argv;
+  process.argv = ['node', 'script', '--from', '2025-02-01', '--to', '2025-01-01'];
+
+  t.after(() => {
+    process.argv = originalArgv;
+  });
+
+  assert.throws(() => parseDateRange(), /Enddatum darf nicht vor dem Startdatum liegen/);
+});
 
 test('isUid recognizes valid numeric IDs', () => {
   assert.equal(isUid(123456), true);

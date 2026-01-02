@@ -2,8 +2,17 @@ const { FinTSClient } = require('./fints-api');
 const { BudgetClient } = require('./budget-api');
 
 const accountData = require(process.env.MAPPING_FILE || './account-mapping.json');
+const parseDateRange = require('./utils/parseDateRange');
 
 const main = async () => {
+
+   let startDate, endDate;
+   try {
+      ({ startDate, endDate } = parseDateRange());
+   } catch (error) {
+      console.error('Fehler beim Parsen des Datumsbereichs:', error.message);
+      return;
+   }
 
    const fintsClient = new FinTSClient();
    // FinTSClient intern ruft async-methoden im ctor — explizit initialisieren und Accounts laden
@@ -36,8 +45,9 @@ const main = async () => {
          fintsClient.setAccount(matchedAccount.iban);
          await budgetClient.setActiveAccount(matchedAccount.actualBudgetAccountName);
 
-
-         const transactions = await fintsClient.getTransaktions(new Date(), new Date());
+         console.log("Umsätze für den Zeitraum", startDate.toLocaleDateString(process.env.LOCALE), "bis", endDate.toLocaleDateString(process.env.LOCALE), "abrufen...");
+         console.log('Verarbeite Konto:', matchedAccount.iban, '->', matchedAccount.actualBudgetAccountName);
+         const transactions = await fintsClient.getTransaktions(startDate, endDate);
          
 
          if (!transactions || transactions.length === 0) {
