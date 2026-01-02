@@ -10,14 +10,14 @@
   "license": "ISC",
   "author": "Bastian Pohl",
   "type": "commonjs",
-  "main": "index.js",
+  "main": "main.js",
   "scripts": {
-    "debug": "node --env-file=.env index.js",
-    "start": "node --env-file=.env index.js",
+    "debug": "node --env-file=.env main.js",
+    "start": "node --env-file=.env main.js",
     "test": "node --test"
   },
   "dependencies": {
-    "@actual-app/api": "^25.11.0",
+    "@actual-app/api": "latest",
     "fints": "^0.5.0"
   },
   "overrides": {
