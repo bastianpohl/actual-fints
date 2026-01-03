@@ -1,16 +1,20 @@
-import express from 'express';
-import { spawn } from 'node:child_process';
+const express = require('express');
+const { spawn } = require('node:child_process');
 
 const app = express();
 app.use(express.json());
 
-app.post('/run', (req, res) => {
-   const { start, end } = req.body ?? {};
-   if (typeof start === 'undefined' || typeof end === 'undefined') {
-      return res.status(400).json({ error: 'Missing start or end' });
-   }
 
-   const child = spawn('node', ['main.js', String(start), String(end)], { stdio: 'pipe' });
+app.post('/api/transactions/load', (req, res) => {
+   const { start, end } = req.body ?? {};
+
+
+   const startArg = `--start ${String(start)}`;
+   const endArg = `--end ${String(end)}`;
+
+   console.log(`Loading transactions from ${start} to ${end}...`);
+
+   const child = spawn('node', ['main.js', '--start', String(start), '--end', String(end)], { stdio: 'pipe' });
    let output = '';
    let errorOutput = '';
 

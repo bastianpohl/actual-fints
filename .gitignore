@@ -18,3 +18,4 @@ actual-budget/
 account-mapping.json
 *.code-workspace
 *launch.json
+*.paw

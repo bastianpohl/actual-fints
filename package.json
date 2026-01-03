@@ -14,10 +14,13 @@
   "scripts": {
     "debug": "node --env-file=.env main.js",
     "start": "node --env-file=.env main.js",
-    "test": "node --test"
+    "test": "node --test",
+    "debug-api": "node rest-api.js",
+    "start-api": "node rest-api.js"
   },
   "dependencies": {
     "@actual-app/api": "latest",
+    "express": "^5.2.1",
     "fints": "^0.5.0"
   },
   "overrides": {
