@@ -8,10 +8,6 @@ app.use(express.json());
 app.post('/api/transactions/load', (req, res) => {
    const { start, end } = req.body ?? {};
 
-
-   const startArg = `--start ${String(start)}`;
-   const endArg = `--end ${String(end)}`;
-
    console.log(`Loading transactions from ${start} to ${end}...`);
 
    const child = spawn('node', ['main.js', '--start', String(start), '--end', String(end)], { stdio: 'pipe' });
