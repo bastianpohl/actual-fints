@@ -15,8 +15,8 @@
     "debug": "node --env-file=.env main.js",
     "start": "node --env-file=.env main.js",
     "test": "node --test",
-    "debug-api": "node rest-api.js",
-    "start-api": "node rest-api.js"
+    "debug-api": "node --env-file=.env rest-api.js",
+    "start-api": "node --env-file=.env rest-api.js"
   },
   "dependencies": {
     "@actual-app/api": "latest",

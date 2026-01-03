@@ -10,7 +10,7 @@ app.post('/api/transactions/load', (req, res) => {
 
    console.log(`Loading transactions from ${start} to ${end}...`);
 
-   const child = spawn('node', ['main.js', '--start', String(start), '--end', String(end)], { stdio: 'pipe' });
+   const child = spawn('node', ['main.js', '--start', start, '--end', end], { stdio: 'pipe' });
    let output = '';
    let errorOutput = '';
 
