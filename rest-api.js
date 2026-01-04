@@ -5,7 +5,7 @@ const app = express();
 app.use(express.json());
 
 
-app.post('/api/transactions/load', (req, res) => {
+app.post('/api/update/transactions', (req, res) => {
    const { start, end } = req.body ?? {};
 
    console.log(`Loading transactions from ${start} to ${end}...`);
@@ -20,6 +20,23 @@ app.post('/api/transactions/load', (req, res) => {
    child.on('close', (code) => {
       if (code === 0) return res.json({ output: output.trim() });
       return res.status(500).json({ error: errorOutput.trim() || 'main.js failed' });
+   });
+});
+
+app.put("/api/update/config", (req, res) => {
+
+   console.log('Updating configuration from git...');
+
+   const child = spawn('git', ['pull'], { stdio: 'pipe' });
+   let output = '';
+   let errorOutput = '';
+
+   child.stdout.on('data', (chunk) => (output += chunk));
+   child.stderr.on('data', (chunk) => (errorOutput += chunk));
+
+   child.on('close', (code) => {
+      if (code === 0) return res.json({ output: output.trim() });
+      return res.status(500).json({ error: errorOutput.trim() || 'pull failed' });
    });
 });
 
