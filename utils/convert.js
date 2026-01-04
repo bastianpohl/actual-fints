@@ -30,7 +30,7 @@ const getNotes = transaction => {
    if (transaction.bankReference) parts.push(`BR: ${transaction.bankReference}`);
 
    const notes = parts.join(' ').replace(/\s+/g, ' ');
-   return notes.slice(0, 2001);
+   return notes.slice(0, 2000);
 };
 
 const getPayeeName = transaction =>
