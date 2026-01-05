@@ -94,5 +94,3 @@ npm install
 ```bash
 npm start
 ```
-
-Test bla
