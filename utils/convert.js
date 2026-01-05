@@ -17,7 +17,7 @@ const getNotes = transaction => {
 
    const parts = [];
 
-   if (text) parts.push(`#${decodeText(text).trim}`);
+   if (text) parts.push(`#${decodeText(text).trim()}`);
    if (reference?.text) parts.push(decodeText(reference.text));
    if (iban) parts.push(`IBAN: ${iban}`);
    if (bic) parts.push(`BIC: ${bic}`);
