@@ -5,7 +5,7 @@ const app = express();
 app.use(express.json());
 
 
-app.post('/api/update/transactions', (req, res) => {
+app.post('/api/transactions/load', (req, res) => {
    const { start, end } = req.body ?? {};
 
    console.log(`Loading transactions from ${start} to ${end}...`);
@@ -23,11 +23,11 @@ app.post('/api/update/transactions', (req, res) => {
    });
 });
 
-app.put("/api/update/config", (req, res) => {
+app.put('/api/update/config', (req, res) => {
 
-   console.log('Updating configuration from git...');
+   console.log('Running deploy script...');
 
-   const child = spawn('git', ['pull'], { stdio: 'pipe' });
+   const child = spawn('./deploy.sh', { stdio: 'pipe' });
    let output = '';
    let errorOutput = '';
 
@@ -36,7 +36,7 @@ app.put("/api/update/config", (req, res) => {
 
    child.on('close', (code) => {
       if (code === 0) return res.json({ output: output.trim() });
-      return res.status(500).json({ error: errorOutput.trim() || 'pull failed' });
+      return res.status(500).json({ error: errorOutput.trim() || 'deploy failed' });
    });
 });
 
