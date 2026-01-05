@@ -89,7 +89,7 @@ git clone <repo>
 cd actual-fints
 npm install
 ```
-
+.
 ### Start
 ```bash
 npm start
