@@ -1,14 +1,17 @@
 [
   {
     "iban": "DE60100100101234567890",
-    "actualBudgetAccountName": "Girokonto Privat"
+    "actualBudgetAccountName": "Girokonto Privat",
+    "actualBudgetAccountID": "123e4567-e89b-12d3-a456-426614174000"
   },
   {
     "iban": "DE11500105170648489890",
-    "actualBudgetAccountName": "Tagesgeld Rücklagen"
+    "actualBudgetAccountName": "Tagesgeld Rücklagen",
+    "actualBudgetAccountID": "123e4567-e89b-12d3-a456-426614174000"
   },
   {
     "iban": "DE45500905001234567892",
-    "actualBudgetAccountName": "Geschäftskonto"
+    "actualBudgetAccountName": "Geschäftskonto",
+    "actualBudgetAccountID": "123e4567-e89b-12d3-a456-426614174000"
   }
 ]
