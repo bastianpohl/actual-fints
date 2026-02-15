@@ -41,7 +41,7 @@ test('getNotes composes structured fields into notes', () => {
   };
 
   const expected =
-    '#Überweisung Überweisung Bonus IBAN: DE44500105175407324931 BIC: COBADEFFXXX E2E: E2E123 CR: CUST BR: BANK';
+    '#Überweisung Bonus Überweisung IBAN: DE44500105175407324931 BIC: COBADEFFXXX E2E: E2E123 CR: CUST BR: BANK';
 
   assert.equal(getNotes(transaction), expected);
 });
