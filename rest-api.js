@@ -1,6 +1,5 @@
 const express = require('express');
 const { spawn } = require('node:child_process');
-const { main } = require('./main');
 
 const app = express();
 app.use(express.json());
@@ -46,29 +45,22 @@ const restartServiceInBackground = () => {
 };
 
 
-app.post('/api/transactions/load', async (req, res) => {
+app.post('/api/transactions/load', (req, res) => {
    const { start, end } = req.body ?? {};
 
-   // Inject date args into process.argv for parseDateRange
-   const originalArgv = process.argv;
-   process.argv = ['node', 'main.js'];
-   if (start) process.argv.push('--start', start);
-   if (end) process.argv.push('--end', end);
+   console.log(`Loading transactions from ${start} to ${end}...`);
 
-   try {
-      const results = await main();
+   const child = spawn('node', ['main.js', '--start', start, '--end', end], { stdio: 'pipe' });
+   let output = '';
+   let errorOutput = '';
 
-      if (!results || results.length === 0) {
-         return res.json({ message: 'Keine neuen Umsätze.' });
-      }
+   child.stdout.on('data', (chunk) => (output += chunk));
+   child.stderr.on('data', (chunk) => (errorOutput += chunk));
 
-      return res.json({ accounts: results });
-   } catch (error) {
-      console.error('Fehler beim Laden der Transaktionen:', error.message);
-      return res.status(500).json({ error: 'Transaktionsabruf fehlgeschlagen.' });
-   } finally {
-      process.argv = originalArgv;
-   }
+   child.on('close', (code) => {
+      if (code === 0) return res.json({ output: output.trim() });
+      return res.status(500).json({ error: errorOutput.trim() || 'main.js failed' });
+   });
 });
 
 app.put('/api/update/config', async (req, res) => {
@@ -82,8 +74,8 @@ app.put('/api/update/config', async (req, res) => {
       restartServiceInBackground();
       return;
    } catch (error) {
-      console.error('Config-Update Fehler:', error.message);
-      return res.status(500).json({ error: 'Konfigurations-Update fehlgeschlagen.' });
+      console.error(error);
+      return res.status(500).json({ error: error.message });
    }
 });
 
