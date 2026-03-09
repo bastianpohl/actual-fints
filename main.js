@@ -1,8 +1,8 @@
 const { FinTSClient } = require('./lib/fints-api');
 const { BudgetClient } = require('./lib/budget-api');
+const { CredentialsStore } = require('./lib/credentials-store');
 const { maskIban } = require('./utils/mask');
 
-const accountData = require(process.env.MAPPING_FILE || './account-mapping.json');
 const parseDateRange = require('./utils/parseDateRange');
 
 const main = async () => {
@@ -15,62 +15,86 @@ const main = async () => {
       return [];
    }
 
-   const fintsClient = new FinTSClient();
-   if (typeof fintsClient.initiateClient === 'function') {
-      await fintsClient.initiateClient();
+   const masterKey = process.env.MASTER_KEY;
+   if (!masterKey) {
+      console.error('MASTER_KEY nicht gesetzt. Bitte in .env definieren.');
+      return [];
    }
-   if (typeof fintsClient.loadAccounts === 'function') {
-      await fintsClient.loadAccounts();
+
+   const store = new CredentialsStore(masterKey);
+   let banks;
+   try {
+      banks = store.getAllBanks();
+   } finally {
+      store.close();
+   }
+
+   if (!banks || banks.length === 0) {
+      console.error('Keine Banken konfiguriert. Nutze "node setup.js add-bank" zum Einrichten.');
+      return [];
    }
 
    const budgetClient = new BudgetClient();
    await budgetClient.loadBudget();
    await budgetClient.getAccounts();
 
-   const fintsAccounts = fintsClient.getAccounts();
-   if (!fintsAccounts || fintsAccounts.length === 0) {
-      console.error('Keine FinTS-Konten verfügbar, Abbruch.');
-      await budgetClient.close();
-      return [];
-   }
-
    const results = [];
 
-   for (const fintsAccount of fintsAccounts) {
+   for (const bank of banks) {
+      console.error(`\n── Bank: ${bank.name} ──`);
+
+      let fintsClient;
       try {
-         const matchedAccount = accountData.find(a => a.iban === fintsAccount.iban);
-         if (!matchedAccount) {
-            console.warn("Kein Mapping für IBAN:", maskIban(fintsAccount.iban));
-            continue;
-         }
-
-         fintsClient.setAccount(matchedAccount.iban);
-         await budgetClient.setActiveAccount(matchedAccount.actualBudgetAccountName);
-
-         console.error('Verarbeite Konto:', maskIban(matchedAccount.iban), '->', matchedAccount.actualBudgetAccountName);
-         const transactions = await fintsClient.getTransaktions(startDate, endDate);
-
-         if (!transactions || transactions.length === 0) {
-            continue;
-         }
-
-         const budgetTransactions = transactions.map(t => budgetClient.convert(t));
-
-         if (budgetTransactions.length > 0) {
-            const importResult = await budgetClient.importTransactions(budgetTransactions);
-            const added = importResult?.added?.length ?? 0;
-            const updated = importResult?.updated?.length ?? 0;
-
-            if (added > 0 || updated > 0) {
-               results.push({
-                  account: matchedAccount.actualBudgetAccountName,
-                  added,
-                  updated,
-               });
-            }
-         }
+         fintsClient = new FinTSClient(bank.fints);
+         await fintsClient.initiateClient();
+         await fintsClient.loadAccounts();
       } catch (err) {
-         console.error('Fehler beim Verarbeiten von Konto', maskIban(fintsAccount?.iban), err.message);
+         console.error(`Fehler bei Bank "${bank.name}":`, err.message);
+         continue;
+      }
+
+      const fintsAccounts = fintsClient.getAccounts();
+      if (!fintsAccounts || fintsAccounts.length === 0) {
+         console.error(`Keine FinTS-Konten für Bank "${bank.name}" verfügbar.`);
+         continue;
+      }
+
+      for (const accountMapping of bank.accounts) {
+         try {
+            const matchedFintsAccount = fintsAccounts.find(a => a.iban === accountMapping.iban);
+            if (!matchedFintsAccount) {
+               console.warn("Kein FinTS-Konto für IBAN:", maskIban(accountMapping.iban));
+               continue;
+            }
+
+            fintsClient.setAccount(accountMapping.iban);
+            await budgetClient.setActiveAccount(accountMapping.actualAccountName);
+
+            console.error('Verarbeite Konto:', maskIban(accountMapping.iban), '->', accountMapping.actualAccountName);
+            const transactions = await fintsClient.getTransaktions(startDate, endDate);
+
+            if (!transactions || transactions.length === 0) {
+               continue;
+            }
+
+            const budgetTransactions = transactions.map(t => budgetClient.convert(t));
+
+            if (budgetTransactions.length > 0) {
+               const importResult = await budgetClient.importTransactions(budgetTransactions);
+               const added = importResult?.added?.length ?? 0;
+               const updated = importResult?.updated?.length ?? 0;
+
+               if (added > 0 || updated > 0) {
+                  results.push({
+                     account: accountMapping.actualAccountName,
+                     added,
+                     updated,
+                  });
+               }
+            }
+         } catch (err) {
+            console.error('Fehler beim Verarbeiten von Konto', maskIban(accountMapping.iban), err.message);
+         }
       }
    }
 

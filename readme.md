@@ -4,7 +4,9 @@ Node.js application that fetches transactions from German bank accounts via **Fi
 
 ## Features
 
-- Supports **multiple bank accounts** via a mapping file
+- Supports **multiple banks** with separate FinTS credentials
+- Bank credentials are **AES-256-GCM encrypted** in a local SQLite database
+- Interactive **CLI setup tool** for managing bank configurations
 - Duplicate detection through Actual Budget's `importTransactions` API
 - REST API to trigger imports via HTTP requests
 
@@ -33,51 +35,43 @@ npm install
 Create a `.env` file in the project directory:
 
 ```env
-# FinTS / Bank
-FINTS_URL=https://banking-url.example.com/fints
-FINTS_LOGIN=online-banking-login
-FINTS_PIN=online-banking-pin
-FINTS_BLZ=12345678
-
 # Actual Budget
 AB_URL=https://actual-budget-server.example.com
 AB_PASS=actual-budget-password
 AB_SYNC_DB=budget-sync-id
 AB_PATH=./actual-budget
 
+# Encryption key for the credentials database
+MASTER_KEY=ein-sicheres-master-passwort
+
 # Optional
 LOCALE=de-DE
-MAPPING_FILE=./account-mapping.json
 PORT=3000
 SERVICE_NAME=actual-fints-api
 ```
 
-### Account Mapping
+### Bank Setup
 
-The file `account-mapping.json` links bank accounts (IBANs) to account names in Actual Budget. See `account-mapping-demo.json` for an example.
+Bank credentials are stored encrypted in a local SQLite database (`credentials.db`). Use the interactive CLI to manage them:
 
-```json
-[
-  {
-    "iban": "DE60100100101234567890",
-    "actualBudgetAccountName": "Girokonto Privat",
-    "actualBudgetAccountID": "123e4567-e89b-12d3-a456-426614174000"
-  },
-  {
-    "iban": "DE11500105170648489890",
-    "actualBudgetAccountName": "Tagesgeld Rücklagen",
-    "actualBudgetAccountID": "123e4567-e89b-12d3-a456-426614174000"
-  }
-]
+```bash
+# Add a new bank
+npm run setup -- add-bank
+
+# List all configured banks and accounts
+npm run setup -- list
+
+# Edit an existing bank
+npm run setup -- edit-bank ExampleBank
+
+# Remove a bank and its accounts
+npm run setup -- remove-bank ExampleBank
 ```
 
-**Important:**
-- IBANs must be normalized (no spaces, uppercase)
-- `actualBudgetAccountName` can be either the **account name** or the **account ID (UUID)** from Actual Budget
-
-## Limitations
-
-- All mapped accounts must belong to the **same bank** (single set of FinTS credentials)
+The setup wizard guides you through entering:
+- Bank name, FinTS URL, BLZ
+- Online banking login and PIN (PIN input is hidden)
+- One or more IBANs with their corresponding Actual Budget account names
 
 ## Usage
 
@@ -131,6 +125,14 @@ PUT /api/update/config
 
 Runs `git pull --ff-only` and restarts the service.
 
+## Security
+
+- Bank credentials (URL, BLZ, Login, PIN) are encrypted with **AES-256-GCM**
+- The encryption key is derived from `MASTER_KEY` via **scrypt**
+- The salt is stored in the database and generated once on first use
+- `credentials.db` and `.env` are excluded from version control via `.gitignore`
+- IBANs are masked in log output for privacy (GDPR compliance)
+
 ## Tests
 
 ```bash
@@ -142,7 +144,9 @@ node --test
 ```
 ├── main.js                   # Main logic (CLI + exported function)
 ├── rest-api.js               # Express REST API
+├── setup.js                  # Interactive CLI for bank management
 ├── lib/
+│   ├── credentials-store.js  # Encrypted SQLite credential store
 │   ├── fints-api.js          # FinTS client wrapper
 │   └── budget-api.js         # Actual Budget API wrapper
 ├── utils/
@@ -152,8 +156,8 @@ node --test
 │   ├── mask.js               # IBAN masking for logs
 │   ├── parseDateRange.js     # CLI argument parsing
 │   └── uid.js                # UID detection
-├── account-mapping.json      # Account mapping (not in repo)
-└── account-mapping-demo.json # Example mapping
+├── credentials.db            # Encrypted bank credentials (not in repo)
+└── .gitignore
 ```
 
 ---
@@ -164,7 +168,9 @@ Node.js-Anwendung, die Transaktionen von deutschen Bankkonten via **FinTS/HBCI**
 
 ## Features
 
-- Unterstützt **mehrere Bankkonten** über eine Mapping-Datei
+- Unterstützt **mehrere Banken** mit separaten FinTS-Zugangsdaten
+- Zugangsdaten werden **AES-256-GCM-verschlüsselt** in einer lokalen SQLite-Datenbank gespeichert
+- Interaktives **CLI-Setup-Tool** zur Verwaltung der Bankkonfigurationen
 - Duplikat-Erkennung durch Actual Budget's `importTransactions` API
 - REST-API zum Auslösen des Imports per HTTP-Request
 - DSGVO-konformes Logging (IBANs werden maskiert)
@@ -194,49 +200,43 @@ npm install
 Erstelle eine `.env`-Datei im Projektverzeichnis:
 
 ```env
-# FinTS / Bank
-FINTS_URL=https://banking-url.example.com/fints
-FINTS_LOGIN=online-banking-login
-FINTS_PIN=online-banking-pin
-FINTS_BLZ=12345678
-
 # Actual Budget
 AB_URL=https://actual-budget-server.example.com
 AB_PASS=actual-budget-passwort
 AB_SYNC_DB=sync-id-des-budgets
 AB_PATH=./actual-budget
 
+# Verschlüsselungsschlüssel für die Credentials-Datenbank
+MASTER_KEY=ein-sicheres-master-passwort
+
 # Optional
 LOCALE=de-DE
-MAPPING_FILE=./account-mapping.json
 PORT=3000
 SERVICE_NAME=actual-fints-api
 ```
 
-### Account-Mapping
+### Bank-Setup
 
-Die Datei `account-mapping.json` verknüpft Bankkonten (IBANs) mit den Kontonamen in Actual Budget. Eine Beispieldatei findest du in `account-mapping-demo.json`.
+Zugangsdaten werden verschlüsselt in einer lokalen SQLite-Datenbank (`credentials.db`) gespeichert. Die Verwaltung erfolgt über ein interaktives CLI:
 
-```json
-[
-  {
-    "iban": "DE60100100101234567890",
-    "actualBudgetAccountName": "Girokonto Privat"
-  },
-  {
-    "iban": "DE11500105170648489890",
-    "actualBudgetAccountName": "Tagesgeld Rücklagen"
-  }
-]
+```bash
+# Neue Bank hinzufügen
+npm run setup -- add-bank
+
+# Alle konfigurierten Banken und Konten anzeigen
+npm run setup -- list
+
+# Bestehende Bank bearbeiten
+npm run setup -- edit-bank ExampleBank
+
+# Bank und zugehörige Konten löschen
+npm run setup -- remove-bank ExampleBank
 ```
 
-**Wichtig:**
-- IBANs müssen normalisiert sein (keine Leerzeichen, Großbuchstaben)
-- `actualBudgetAccountName` kann entweder der **Kontoname** oder die **Konto-ID (UUID)** aus Actual Budget sein
-
-## Einschränkungen
-
-- Alle gemappten Konten müssen bei der **gleichen Bank** sein (ein Satz FinTS-Zugangsdaten)
+Der Setup-Assistent führt durch:
+- Bankname, FinTS-URL, BLZ
+- Online-Banking Login und PIN (PIN-Eingabe wird nicht angezeigt)
+- Eine oder mehrere IBANs mit zugehörigem Actual Budget Kontonamen
 
 ## Verwendung
 
@@ -290,6 +290,14 @@ PUT /api/update/config
 
 Führt `git pull --ff-only` aus und startet den Service neu.
 
+## Sicherheit
+
+- Zugangsdaten (URL, BLZ, Login, PIN) sind mit **AES-256-GCM** verschlüsselt
+- Der Schlüssel wird aus `MASTER_KEY` via **scrypt** abgeleitet
+- Der Salt wird in der Datenbank gespeichert und einmalig beim ersten Start generiert
+- `credentials.db` und `.env` sind über `.gitignore` vom Versionskontrollsystem ausgeschlossen
+- IBANs werden in Logs zum Datenschutz maskiert (DSGVO-konform)
+
 ## Tests
 
 ```bash
@@ -301,7 +309,9 @@ node --test
 ```
 ├── main.js                   # Hauptlogik (CLI + exportierte Funktion)
 ├── rest-api.js               # Express REST-API
+├── setup.js                  # Interaktives CLI für Bankverwaltung
 ├── lib/
+│   ├── credentials-store.js  # Verschlüsselter SQLite-Credential-Store
 │   ├── fints-api.js          # FinTS-Client Wrapper
 │   └── budget-api.js         # Actual Budget API Wrapper
 ├── utils/
@@ -311,6 +321,6 @@ node --test
 │   ├── mask.js               # IBAN-Maskierung für Logs
 │   ├── parseDateRange.js     # CLI-Argument Parsing
 │   └── uid.js                # UID-Erkennung
-├── account-mapping.json      # Konto-Mapping (nicht im Repo)
-└── account-mapping-demo.json # Beispiel-Mapping
+├── credentials.db            # Verschlüsselte Zugangsdaten (nicht im Repo)
+└── .gitignore
 ```

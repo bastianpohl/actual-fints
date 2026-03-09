@@ -16,6 +16,7 @@ tmp/
 actual-sync/
 actual-budget/
 account-mapping.json
+credentials.db
 *.code-workspace
 *launch.json
 *.paw

@@ -12,6 +12,7 @@
   "type": "commonjs",
   "main": "main.js",
   "scripts": {
+    "setup": "node --env-file=.env setup.js",
     "debug": "node --env-file=.env main.js",
     "start": "node --env-file=.env main.js",
     "test": "node --test",
