@@ -80,17 +80,29 @@ const main = async () => {
             const budgetTransactions = transactions.map(t => budgetClient.convert(t));
 
             if (budgetTransactions.length > 0) {
+               const existingIds = await budgetClient.getExistingImportedIds();
+               
                const importResult = await budgetClient.importTransactions(budgetTransactions);
                const added = importResult?.added?.length ?? 0;
                const updated = importResult?.updated?.length ?? 0;
 
-               if (added > 0 || updated > 0) {
-                  results.push({
-                     account: accountMapping.actualAccountName,
-                     added,
-                     updated,
-                  });
-               }
+               const txDetails = budgetTransactions.map(bt => {
+                  const isExisting = existingIds.has(bt.imported_id);
+                  return {
+                     date: bt.date,
+                     payee: bt.payee_name || 'Unbekannter Empfänger',
+                     amount: bt.amount,
+                     status: isExisting ? 'ignored' : 'added'
+                  };
+               });
+
+               results.push({
+                  account: accountMapping.actualAccountName,
+                  added,
+                  updated,
+                  ignored: budgetTransactions.length - added,
+                  transactions: txDetails
+               });
             }
          } catch (err) {
             console.error('Fehler beim Verarbeiten von Konto', maskIban(accountMapping.iban), err.message);

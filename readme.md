@@ -9,6 +9,7 @@ Node.js application that fetches transactions from German bank accounts via **Fi
 - Interactive **CLI setup tool** for managing bank configurations
 - Duplicate detection through Actual Budget's `importTransactions` API
 - REST API to trigger imports via HTTP requests
+- **Interactive Web Dashboard (SPA)**: A beautiful mobile-optimized interface to sync transactions, view live logs, and manage accounts (with premium iOS native bottom-sheets and auto-zoom prevention)
 
 ## Dependencies
 
@@ -125,6 +126,22 @@ PUT /api/update/config
 
 Runs `git pull --ff-only` and restarts the service.
 
+### Web Dashboard & SPA
+
+The application serves a gorgeous single-page web dashboard directly from `http://127.0.0.1:3000` (or your configured port). It allows you to:
+- Sync bank transactions dynamically and visualize added vs. ignored (duplicate) ones.
+- Manage bank settings (BLZ, URL, IBAN mappings) without writing code.
+- View live real-time output logs.
+
+#### iOS & Mobile Smartphone Optimizations
+
+The SPA has been tailored specifically for iPhones/smartphones, offering a premium native-like app experience:
+- **Viewport-fit Cover & Safe Areas**: Seamless integration with iPhone safe area paddings (`viewport-fit=cover`), ensuring notch/dynamic island and home indicator compatibility.
+- **Native Bottom-Sheets**: Modals slide up beautifully from the bottom with a native spring animation on screens `< 600px`, complete with a visual dragging handle.
+- **Form-stacking & Touch Targets**: Controls are optimized to comfortable touch sizes (minimum 44px/48px) and automatically stack vertically.
+- **Auto-Zoom Prevention**: Enforces a `16px` font size on active form inputs under iOS Safari to prevent disruptive automated screen zooming on focus.
+- **Touch-Momentum & Swipe Scroll**: Native inertia scrolling is enabled on all log/terminal sections, and the transaction list table supports horizontal swipe navigation.
+
 ## Security
 
 - Bank credentials (URL, BLZ, Login, PIN) are encrypted with **AES-256-GCM**
@@ -174,6 +191,7 @@ Node.js-Anwendung, die Transaktionen von deutschen Bankkonten via **FinTS/HBCI**
 - Duplikat-Erkennung durch Actual Budget's `importTransactions` API
 - REST-API zum Auslösen des Imports per HTTP-Request
 - DSGVO-konformes Logging (IBANs werden maskiert)
+- **Interaktives Web-Dashboard (SPA)**: Eine wunderschöne, für Smartphones und iOS Safari optimierte Weboberfläche zum Synchronisieren, Verwalten von Banken und Ansehen von Live-Logs (inkl. nativen Bottom-Sheets und Auto-Zoom-Schutz)
 
 ## Abhängigkeiten
 
@@ -289,6 +307,22 @@ PUT /api/update/config
 ```
 
 Führt `git pull --ff-only` aus und startet den Service neu.
+
+### Web-Dashboard & SPA
+
+Die Anwendung stellt direkt über `http://127.0.0.1:3000` (oder deinen konfigurierten Port) ein wunderschönes, reaktionsschnelles Single-Page Web-Dashboard bereit. Es ermöglicht dir:
+- Den Transaktionsimport live zu starten und hinzugefügte vs. ignorierte (Duplikat-)Umsätze differenziert zu visualisieren.
+- Deine Bankverbindungen und Konto-Mappings komfortabel im Browser zu pflegen.
+- Die Ausführungsprotokolle (System-Logs) in Echtzeit im integrierten Live-Terminal einzusehen.
+
+#### iOS- & Smartphone-Optimierungen
+
+Die SPA wurde speziell für iPhones und andere Smartphones optimiert, um eine App-ähnliche, native Benutzererfahrung im mobilen Browser zu bieten:
+- **Viewport-fit Cover & Safe-Areas**: Volle Kompatibilität mit randlosen iPhone-Displays (`viewport-fit=cover`). Alle Abstände passen sich über CSS-Safe-Areas automatisch an Notch und Home-Indikator an.
+- **Native Bottom-Sheets**: Dialoge und Formulare gleiten auf Smartphones (`< 600px`) als native Bottom-Sheets mit Feder-Animation von unten herauf und besitzen einen optischen Zieh-Griff.
+- **Bequeme Touch-Targets**: Sämtliche Buttons und Navigationstabs besitzen eine Mindesthöhe von `44px` bis `48px`, um Fehlklicks zu verhindern.
+- **Auto-Zoom-Schutz**: Durch die gezielte Forcierung einer Schriftgröße von `16px` bei Eingabefeldern im mobilen Fokus wird das lästige automatische Heranzoomen unter iOS Safari unterbunden.
+- **Inertia Touch Scroll**: Butterweiches Trägheitsscrollen (`-webkit-overflow-scrolling: touch`) in Scrollbereichen (wie System-Logs) und horizontal wischbare Ergebnistabellen, ohne dass das Layout gesprengt wird.
 
 ## Sicherheit
 

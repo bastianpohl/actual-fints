@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+   <title>Actual-FinTS Connector Dashboard</title>
+   <link rel="stylesheet" href="style.css">
+</head>
+<body>
+   <div class="app-container">
+      
+      <!-- Brand Header -->
+      <header>
+         <div class="brand-section">
+            <h1>🏦 Actual‑FinTS Connector</h1>
+            <p>Deutscher Banken-Sync für Actual Budget</p>
+         </div>
+         <nav class="nav-tabs">
+            <button class="nav-tab active" data-tab="dashboard">
+               <span>📊</span> Dashboard
+            </button>
+            <button class="nav-tab" data-tab="banks" id="banks-tab-btn">
+               <span>🏦</span> Banken
+            </button>
+            <button class="nav-tab" data-tab="logs" id="logs-tab-btn">
+               <span>📟</span> System-Logs
+            </button>
+         </nav>
+      </header>
+
+      <!-- Page 1: Dashboard -->
+      <main id="dashboard-tab" class="tab-content active">
+         <!-- Status Summary Cards -->
+         <div class="status-grid">
+            <div class="glass-card status-badge">
+               <div class="status-icon success" id="status-actual-icon">✓</div>
+               <div class="status-details">
+                  <h3>Actual Budget</h3>
+                  <p id="status-actual-text">Verbinde...</p>
+               </div>
+            </div>
+            <div class="glass-card status-badge">
+               <div class="status-icon success" id="status-db-icon">✓</div>
+               <div class="status-details">
+                  <h3>Banken & Konten</h3>
+                  <p id="status-db-text">0 Banken (0 Konten)</p>
+               </div>
+            </div>
+            <div class="glass-card status-badge">
+               <div class="status-icon success" id="status-sync-icon">⏰</div>
+               <div class="status-details">
+                  <h3>Letzter Sync</h3>
+                  <p id="status-sync-text">Nie</p>
+               </div>
+            </div>
+         </div>
+
+         <!-- Sync Operations Grid -->
+         <div class="dashboard-grid">
+            <!-- Sync Action Box -->
+            <div class="glass-card sync-section">
+               <div class="sync-header">
+                  <h2>Transaktionen abrufen & importieren</h2>
+                  <span class="status-icon warning" style="width:32px; height:32px; font-size:1rem;" id="sync-running-spinner">⏳</span>
+               </div>
+               
+               <p style="color: var(--text-secondary); font-size:0.9rem;">
+                  Lade Umsätze via FinTS ab und importiere sie vollautomatisch direkt in deine Actual Budget Konten. 
+               </p>
+
+               <div class="date-inputs">
+                  <div class="form-group">
+                     <label for="sync-start-date">Startdatum (Optional)</label>
+                     <input type="date" id="sync-start-date" class="input-field">
+                  </div>
+                  <div class="form-group">
+                     <label for="sync-end-date">Enddatum (Optional)</label>
+                     <input type="date" id="sync-end-date" class="input-field">
+                  </div>
+               </div>
+
+               <div class="sync-action-row" style="margin-top:0.5rem;">
+                  <span style="font-size:0.85rem; color:var(--text-secondary);" id="sync-info-msg">Wähle Zeitspanne oder lasse Felder leer für "Heute".</span>
+                  <button class="btn" id="start-sync-btn">
+                     <span>⚡</span> Sync starten
+                  </button>
+               </div>
+            </div>
+
+            <!-- Health Config Box -->
+            <div class="glass-card" style="display:flex; flex-direction:column; justify-content:space-between;">
+               <div>
+                  <h2 style="font-size:1.2rem; font-weight:600; margin-bottom:1rem;">Systemkonfiguration</h2>
+                  <div style="display:flex; flex-direction:column; gap:0.75rem; font-size:0.9rem;">
+                     <div style="display:flex; justify-content:space-between;">
+                        <span style="color: var(--text-secondary);">MASTER_KEY:</span>
+                        <span id="config-master-key" class="account-actual-name" style="color:var(--success);">Gefunden</span>
+                     </div>
+                     <div style="display:flex; justify-content:space-between;">
+                        <span style="color: var(--text-secondary);">Actual Server URL:</span>
+                        <span id="config-ab-url" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">-</span>
+                     </div>
+                     <div style="display:flex; justify-content:space-between;">
+                        <span style="color: var(--text-secondary);">Budget Sync ID:</span>
+                        <span id="config-ab-sync" style="font-family: var(--font-mono); font-size:0.8rem;">-</span>
+                     </div>
+                  </div>
+               </div>
+               
+               <button class="btn secondary" id="git-update-btn" style="margin-top:1.5rem;">
+                  <span>🔄</span> Git Pull & API Update
+               </button>
+            </div>
+         </div>
+
+         <!-- Sync Result Visualization -->
+         <div class="glass-card" id="sync-results-card" style="margin-top: 1.5rem; display: none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem; border-bottom:1px solid rgba(255, 255, 255, 0.05); padding-bottom:0.75rem;">
+               <h2 style="font-size:1.25rem; font-weight:600; display:flex; align-items:center; gap:0.5rem;">
+                  <span>📋</span> Importierte Umsätze
+               </h2>
+               <button class="btn secondary" id="close-sync-results-btn" style="padding:0.35rem 0.75rem; font-size:0.8rem;">Ausblenden</button>
+            </div>
+            <div class="table-scroll-container" style="max-height: 400px; overflow-y: auto;">
+               <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+                  <thead>
+                     <tr style="color: var(--text-muted); border-bottom: 1px solid rgba(255, 255, 255, 0.08); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                        <th style="padding: 0.6rem 0.5rem; font-weight:500;">Datum</th>
+                        <th style="padding: 0.6rem 0.5rem; font-weight:500;">Konto</th>
+                        <th style="padding: 0.6rem 0.5rem; font-weight:500;">Empfänger / Verwendungszweck</th>
+                        <th style="padding: 0.6rem 0.5rem; font-weight:500; text-align: right;">Betrag</th>
+                        <th style="padding: 0.6rem 0.5rem; font-weight:500; text-align: center;">Status</th>
+                     </tr>
+                  </thead>
+                  <tbody id="sync-results-table-body">
+                     <!-- Dynamic rows injected here -->
+                  </tbody>
+               </table>
+            </div>
+         </div>
+      </main>
+
+      <!-- Page 2: Banks configuration -->
+      <main id="banks-tab" class="tab-content">
+         <div class="bank-list-header">
+            <h2>Konfigurierte Banken</h2>
+            <button class="btn" id="add-bank-btn">
+               <span>➕</span> Bank hinzufügen
+            </button>
+         </div>
+
+         <!-- Bank Cards populated dynamically -->
+         <div class="bank-cards-grid" id="bank-cards-container">
+            <!-- Dynamic Injection -->
+         </div>
+      </main>
+
+      <!-- Page 3: Logs Terminal -->
+      <main id="logs-tab" class="tab-content">
+         <div class="bank-list-header">
+            <h2>Ausführungsprotokolle</h2>
+            <div style="display:flex; gap:0.75rem;">
+               <button class="btn secondary" id="clear-logs-ui-btn">Logs leeren</button>
+               <button class="btn" id="refresh-logs-btn">Aktualisieren</button>
+            </div>
+         </div>
+
+         <div class="terminal-window">
+            <div class="terminal-header">
+               <div class="terminal-bullets">
+                  <div class="bullet red"></div>
+                  <div class="bullet yellow"></div>
+                  <div class="bullet green"></div>
+               </div>
+               <div class="terminal-title">sync.log – Live Viewer</div>
+               <div></div>
+            </div>
+            <div class="terminal-content" id="terminal-log-content">Noch keine Logs geladen.</div>
+         </div>
+      </main>
+
+      <!-- Modal: Add/Edit Bank -->
+      <div class="modal-backdrop" id="bank-modal">
+         <div class="glass-card modal-card">
+            <div class="modal-header">
+               <h2 id="modal-title">Neue Bank hinzufügen</h2>
+               <button class="close-btn" id="modal-close-btn">&times;</button>
+            </div>
+            <form class="modal-form" id="bank-form" onsubmit="return false;">
+               <input type="hidden" id="bank-modal-edit-mode" value="">
+               
+               <div class="form-group">
+                  <label for="bank-input-name">Bankname (z.B. ING, Sparkasse)</label>
+                  <input type="text" id="bank-input-name" class="input-field" required placeholder="z.B. ING-DiBa">
+               </div>
+
+               <div class="form-group">
+                  <label for="bank-input-url">FinTS-URL (HBCI-Server)</label>
+                  <input type="url" id="bank-input-url" class="input-field" required placeholder="https://fints.ing.de/fints/">
+               </div>
+
+               <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+                  <div class="form-group">
+                     <label for="bank-input-blz">BLZ (8-stellig)</label>
+                     <input type="text" id="bank-input-blz" class="input-field" required placeholder="e.g. 50050050">
+                  </div>
+                  <div class="form-group">
+                     <label for="bank-input-login">Online-Banking Login</label>
+                     <input type="text" id="bank-input-login" class="input-field" required placeholder="Benutzername/Kontonr">
+                  </div>
+               </div>
+
+               <div class="form-group">
+                  <label for="bank-input-pin">Online-Banking PIN</label>
+                  <input type="password" id="bank-input-pin" class="input-field" required placeholder="Passwort/PIN">
+                  <span style="font-size:0.75rem; color:var(--text-muted);">Deine PIN wird ausschließlich AES-256-GCM-verschlüsselt in credentials.db gespeichert.</span>
+               </div>
+
+               <!-- Accounts Mapping Section -->
+               <div class="modal-accounts-section">
+                  <div class="modal-accounts-title">
+                     <h3>Konto-Mappings (FinTS IBAN → Actual Budget Name)</h3>
+                     <button class="btn secondary" type="button" id="modal-add-account-row" style="padding:0.3rem 0.6rem; font-size:0.8rem;">
+                        ＋ Zeile
+                     </button>
+                  </div>
+                  <div id="modal-account-rows-container">
+                     <!-- Dynamic Rows populated here -->
+                  </div>
+               </div>
+
+               <div class="modal-actions">
+                  <button class="btn secondary" type="button" id="modal-cancel-btn">Abbrechen</button>
+                  <button class="btn" type="submit" id="modal-submit-btn">Speichern</button>
+               </div>
+            </form>
+         </div>
+      </div>
+
+      <!-- Toast Container -->
+      <div class="toast-container" id="toast-container"></div>
+
+   </div>
+
+   <script src="app.js"></script>
+</body>
+</html>
