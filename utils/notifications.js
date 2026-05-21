@@ -26,6 +26,19 @@ function formatDate(dateStr) {
 }
 
 /**
+ * Helper to encode non-ASCII header values using RFC 2047 MIME encoded-words.
+ * This prevents the undici/fetch "ByteString" validation error with emojis/unicode.
+ * @param {string} value
+ * @returns {string}
+ */
+function encodeHeaderValue(value) {
+   if (!value) return '';
+   const hasNonAscii = /[^\x00-\x7F]/.test(value);
+   if (!hasNonAscii) return value;
+   return `=?utf-8?B?${Buffer.from(value, 'utf8').toString('base64')}?=`;
+}
+
+/**
  * Sends a push notification via ntfy.sh.
  * @param {string} title 
  * @param {string} message 
@@ -47,14 +60,21 @@ async function sendNtfy(title, message, tags = '', priority = 'default', overrid
    const url = `${serverBase}/${topic}`;
 
    try {
+      const headers = {
+         'Priority': priority,
+         'Content-Type': 'text/plain; charset=utf-8'
+      };
+
+      if (title) {
+         headers['Title'] = encodeHeaderValue(title);
+      }
+      if (tags) {
+         headers['Tags'] = encodeHeaderValue(tags);
+      }
+
       const response = await fetch(url, {
          method: 'POST',
-         headers: {
-            'Title': title,
-            'Tags': tags,
-            'Priority': priority,
-            'Content-Type': 'text/plain; charset=utf-8'
-         },
+         headers,
          body: message
       });
 
