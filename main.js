@@ -119,11 +119,39 @@ if (require.main === module) {
    main()
       .then(async results => {
          console.log(JSON.stringify(results));
-         await sendSuccessNotification(results);
+         const masterKey = process.env.MASTER_KEY;
+         let ntfyTopic = '';
+         let ntfyServer = 'https://ntfy.sh';
+         if (masterKey) {
+            const store = new CredentialsStore(masterKey);
+            try {
+               ntfyTopic = store.getConfig('ntfy_topic');
+               ntfyServer = store.getConfig('ntfy_server') || 'https://ntfy.sh';
+            } catch (e) {
+               console.error('Fehler beim Laden der Notification-Config aus DB:', e.message);
+            } finally {
+               store.close();
+            }
+         }
+         await sendSuccessNotification(results, ntfyTopic, ntfyServer);
       })
       .catch(async err => {
          console.error('Unhandled error in main:', err);
-         await sendFailureNotification(err);
+         const masterKey = process.env.MASTER_KEY;
+         let ntfyTopic = '';
+         let ntfyServer = 'https://ntfy.sh';
+         if (masterKey) {
+            const store = new CredentialsStore(masterKey);
+            try {
+               ntfyTopic = store.getConfig('ntfy_topic');
+               ntfyServer = store.getConfig('ntfy_server') || 'https://ntfy.sh';
+            } catch (e) {
+               console.error('Fehler beim Laden der Notification-Config aus DB:', e.message);
+            } finally {
+               store.close();
+            }
+         }
+         await sendFailureNotification(err, ntfyTopic, ntfyServer);
          process.exitCode = 1;
       });
 }

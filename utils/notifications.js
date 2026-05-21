@@ -31,15 +31,20 @@ function formatDate(dateStr) {
  * @param {string} message 
  * @param {string} tags 
  * @param {string} priority - 'min', 'low', 'default', 'high', 'urgent'
+ * @param {string} [overrideTopic]
+ * @param {string} [overrideServer]
  */
-async function sendNtfy(title, message, tags = '', priority = 'default') {
-   if (!ntfyTopic) {
-      console.error('Push-Notification übersprungen: NTFY_TOPIC ist nicht in der .env definiert.');
+async function sendNtfy(title, message, tags = '', priority = 'default', overrideTopic = null, overrideServer = null) {
+   const topic = overrideTopic ?? ntfyTopic;
+   const server = overrideServer ?? ntfyServer;
+
+   if (!topic) {
+      console.error('Push-Notification übersprungen: ntfy Topic ist nicht definiert.');
       return;
    }
 
-   const serverBase = ntfyServer.endsWith('/') ? ntfyServer.slice(0, -1) : ntfyServer;
-   const url = `${serverBase}/${ntfyTopic}`;
+   const serverBase = server.endsWith('/') ? server.slice(0, -1) : server;
+   const url = `${serverBase}/${topic}`;
 
    try {
       const response = await fetch(url, {
@@ -64,8 +69,10 @@ async function sendNtfy(title, message, tags = '', priority = 'default') {
 /**
  * Analyzes the import results and sends a success notification.
  * @param {Array} results 
+ * @param {string} [overrideTopic]
+ * @param {string} [overrideServer]
  */
-async function sendSuccessNotification(results) {
+async function sendSuccessNotification(results, overrideTopic = null, overrideServer = null) {
    if (!results || !Array.isArray(results)) return;
 
    // Filter for accounts that have new transactions
@@ -103,14 +110,16 @@ async function sendSuccessNotification(results) {
       message = 'Alle Konten sind auf dem neuesten Stand. Keine neuen Umsätze gefunden.';
    }
 
-   await sendNtfy(title, message, tags, priority);
+   await sendNtfy(title, message, tags, priority, overrideTopic, overrideServer);
 }
 
 /**
  * Sends a failure notification with error details.
  * @param {Error|string} error 
+ * @param {string} [overrideTopic]
+ * @param {string} [overrideServer]
  */
-async function sendFailureNotification(error) {
+async function sendFailureNotification(error, overrideTopic = null, overrideServer = null) {
    const title = 'FinTS-Import FEHLGESCHLAGEN 🚨';
    const tags = 'warning,skull';
    const priority = 'high'; // high alert, will ring/vibrate
@@ -120,7 +129,7 @@ async function sendFailureNotification(error) {
 Fehlermeldung:
 ${error?.message || error || 'Unbekannter Fehler'}`;
 
-   await sendNtfy(title, message, tags, priority);
+   await sendNtfy(title, message, tags, priority, overrideTopic, overrideServer);
 }
 
 module.exports = {

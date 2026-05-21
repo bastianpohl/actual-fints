@@ -234,31 +234,40 @@ const setEnvValue = (key, value) => {
 
 // GET /api/notifications/config - Retrieve the current ntfy config
 app.get('/api/notifications/config', (req, res) => {
+   const masterKey = process.env.MASTER_KEY;
+   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht gesetzt.' });
+
+   const store = new CredentialsStore(masterKey);
    try {
-      const topic = getEnvValue('NTFY_TOPIC');
-      const server = getEnvValue('NTFY_SERVER') || 'https://ntfy.sh';
+      const topic = store.getConfig('ntfy_topic') || '';
+      const server = store.getConfig('ntfy_server') || 'https://ntfy.sh';
       return res.json({ topic, server });
    } catch (err) {
       return res.status(500).json({ error: err.message });
+   } finally {
+      store.close();
    }
 });
 
-// POST /api/notifications/config - Save the ntfy config and restart the api service in the background
+// POST /api/notifications/config - Save the ntfy config
 app.post('/api/notifications/config', (req, res) => {
+   const masterKey = process.env.MASTER_KEY;
+   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht gesetzt.' });
+
    const { topic, server } = req.body ?? {};
    if (topic === undefined || server === undefined) {
       return res.status(400).json({ error: 'Topic und Server-URL sind erforderlich.' });
    }
 
+   const store = new CredentialsStore(masterKey);
    try {
-      setEnvValue('NTFY_TOPIC', topic.trim());
-      setEnvValue('NTFY_SERVER', server.trim());
-      res.json({ success: true, topic: topic.trim(), server: server.trim() });
-
-      // Restart service to pick up the new env variables
-      restartServiceInBackground();
+      store.setConfig('ntfy_topic', topic.trim());
+      store.setConfig('ntfy_server', server.trim());
+      return res.json({ success: true, topic: topic.trim(), server: server.trim() });
    } catch (err) {
       return res.status(500).json({ error: err.message });
+   } finally {
+      store.close();
    }
 });
 

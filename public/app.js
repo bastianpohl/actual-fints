@@ -62,7 +62,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnShowTopic = document.getElementById('btn-show-topic');
     const btnGenerateTopic = document.getElementById('btn-generate-topic');
     const saveNtfyBtn = document.getElementById('save-ntfy-btn');
-    const ntfySetupGuide = document.getElementById('ntfy-setup-guide');
+    const ntfySetupGuideRead = document.getElementById('ntfy-setup-guide-read');
+
+    const ntfyReadView = document.getElementById('ntfy-read-view');
+    const ntfyEditView = document.getElementById('ntfy-edit-view');
+    const ntfyTopicDisplay = document.getElementById('ntfy-topic-display');
+    const ntfyServerDisplay = document.getElementById('ntfy-server-display');
+    const btnCopyTopic = document.getElementById('btn-copy-topic');
+    const btnCopyServer = document.getElementById('btn-copy-server');
+    const btnSwitchToEdit = document.getElementById('btn-switch-to-edit');
+    const btnCancelEdit = document.getElementById('btn-cancel-edit');
 
    // Hide running spinner initially
    syncRunningSpinner.style.visibility = 'hidden';
@@ -578,14 +587,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- PUSH NOTIFICATION HANDLERS ---
+    let lastSavedTopic = '';
+    let lastSavedServer = '';
+
     const updateNtfySetupGuide = (topic, server) => {
-       if (!topic) {
-          ntfySetupGuide.innerHTML = 'Kein Push-Topic konfiguriert. Generiere eines, um Benachrichtigungen zu aktivieren.';
+       if (!topic || topic === '-' || topic === 'Kein Topic konfiguriert') {
+          ntfySetupGuideRead.innerHTML = 'Kein Push-Topic konfiguriert. Generiere eines, um Benachrichtigungen zu aktivieren.';
           return;
        }
        const base = server ? (server.endsWith('/') ? server.slice(0, -1) : server) : 'https://ntfy.sh';
        const url = `${base}/${topic}`;
-       ntfySetupGuide.innerHTML = `Abonniere das Topic in der ntfy-App:<br><a href="${url}" target="_blank" style="color:var(--primary); text-decoration:underline; font-family:var(--font-mono); word-break:break-all; font-size: 0.8rem; display: inline-block; margin-top: 0.25rem;">${topic}</a>`;
+       ntfySetupGuideRead.innerHTML = `Abonniere das Topic in der ntfy-App:<br><a href="${url}" target="_blank" style="color:var(--accent-primary); text-decoration:underline; font-family:var(--font-mono); word-break:break-all; font-size: 0.8rem; display: inline-block; margin-top: 0.25rem;">${topic}</a>`;
     };
 
     const loadNtfyTopic = async () => {
@@ -593,19 +605,72 @@ document.addEventListener('DOMContentLoaded', () => {
           const res = await fetch('/api/notifications/config');
           if (res.ok) {
              const data = await res.json();
-             ntfyServerInput.value = data.server || '';
-             if (data.topic) {
-                ntfyTopicInput.value = data.topic;
-                updateNtfySetupGuide(data.topic, data.server);
+             lastSavedServer = data.server || 'https://ntfy.sh';
+             lastSavedTopic = data.topic || '';
+
+             ntfyServerInput.value = lastSavedServer;
+             ntfyServerDisplay.textContent = lastSavedServer;
+
+             if (lastSavedTopic) {
+                ntfyTopicInput.value = lastSavedTopic;
+                ntfyTopicDisplay.textContent = lastSavedTopic;
+                updateNtfySetupGuide(lastSavedTopic, lastSavedServer);
              } else {
                 ntfyTopicInput.value = '';
-                updateNtfySetupGuide('', data.server);
+                ntfyTopicDisplay.textContent = 'Kein Topic konfiguriert';
+                updateNtfySetupGuide('', lastSavedServer);
              }
           }
        } catch (err) {
           console.error('Error fetching ntfy config:', err);
        }
     };
+
+    if (btnSwitchToEdit) {
+       btnSwitchToEdit.addEventListener('click', (e) => {
+          e.preventDefault();
+          ntfyReadView.style.display = 'none';
+          ntfyEditView.style.display = 'flex';
+       });
+    }
+
+    if (btnCancelEdit) {
+       btnCancelEdit.addEventListener('click', (e) => {
+          e.preventDefault();
+          // Reset inputs to last saved values
+          ntfyTopicInput.value = lastSavedTopic;
+          ntfyServerInput.value = lastSavedServer;
+          ntfyTopicInput.type = 'password';
+          if (btnShowTopic) btnShowTopic.textContent = 'Anzeigen';
+
+          ntfyEditView.style.display = 'none';
+          ntfyReadView.style.display = 'flex';
+       });
+    }
+
+    if (btnCopyTopic) {
+       btnCopyTopic.addEventListener('click', (e) => {
+          e.preventDefault();
+          const topic = ntfyTopicDisplay.textContent;
+          if (!topic || topic === 'Kein Topic konfiguriert' || topic === '-') {
+             showToast('Kein Topic zum Kopieren vorhanden.', 'error');
+             return;
+          }
+          navigator.clipboard.writeText(topic)
+             .then(() => showToast('Topic in die Zwischenablage kopiert!', 'success'))
+             .catch(() => showToast('Fehler beim Kopieren des Topics.', 'error'));
+       });
+    }
+
+    if (btnCopyServer) {
+       btnCopyServer.addEventListener('click', (e) => {
+          e.preventDefault();
+          const server = ntfyServerDisplay.textContent;
+          navigator.clipboard.writeText(server)
+             .then(() => showToast('Server-URL in die Zwischenablage kopiert!', 'success'))
+             .catch(() => showToast('Fehler beim Kopieren der Server-URL.', 'error'));
+       });
+    }
 
     if (btnShowTopic) {
        btnShowTopic.addEventListener('click', (e) => {
@@ -629,7 +694,6 @@ document.addEventListener('DOMContentLoaded', () => {
           ntfyTopicInput.value = secureTopic;
           ntfyTopicInput.type = 'text';
           if (btnShowTopic) btnShowTopic.textContent = 'Verbergen';
-          updateNtfySetupGuide(secureTopic, ntfyServerInput.value.trim());
           showToast('Zufälliges Topic generiert. Vergiss nicht zu speichern!', 'success');
        });
     }
@@ -653,8 +717,17 @@ document.addEventListener('DOMContentLoaded', () => {
              });
              
              if (res.ok) {
-                showToast('Push-Konfiguration erfolgreich gespeichert und API neu gestartet!', 'success');
+                showToast('Push-Konfiguration erfolgreich in DB gespeichert!', 'success');
+                lastSavedTopic = topic;
+                lastSavedServer = server;
+
+                ntfyTopicDisplay.textContent = topic || 'Kein Topic konfiguriert';
+                ntfyServerDisplay.textContent = server;
                 updateNtfySetupGuide(topic, server);
+
+                // Switch back to read-only view
+                ntfyEditView.style.display = 'none';
+                ntfyReadView.style.display = 'flex';
              } else {
                 const errData = await res.json();
                 showToast(errData.error || 'Fehler beim Speichern der Konfiguration.', 'error');
@@ -663,7 +736,7 @@ document.addEventListener('DOMContentLoaded', () => {
              showToast('Netzwerkfehler beim Speichern der Konfiguration.', 'error');
           } finally {
              saveNtfyBtn.disabled = false;
-             saveNtfyBtn.innerHTML = '<span>💾</span> Speichern & Aktivieren';
+             saveNtfyBtn.innerHTML = '<span>💾</span> Speichern';
           }
        });
     }
