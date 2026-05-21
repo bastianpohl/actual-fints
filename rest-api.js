@@ -14,6 +14,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const SERVICE_NAME = process.env.SERVICE_NAME ?? 'actual-fints-api';
 const LOG_FILE = path.join(__dirname, 'sync.log');
+const ENV_FILE = path.join(__dirname, '.env');
 
 const runCommand = (command, args = [], options = {}) => {
    return new Promise((resolve, reject) => {
@@ -190,6 +191,70 @@ app.get('/api/logs', (req, res) => {
       }
       const logs = fs.readFileSync(LOG_FILE, 'utf8');
       return res.json({ logs: logs.trim() });
+   } catch (err) {
+      return res.status(500).json({ error: err.message });
+   }
+});
+
+// Helper functions for reading and writing .env values
+const getEnvValue = (key) => {
+   if (!fs.existsSync(ENV_FILE)) return process.env[key] ?? '';
+   const content = fs.readFileSync(ENV_FILE, 'utf8');
+   const lines = content.split('\n');
+   for (const line of lines) {
+      const match = line.match(new RegExp(`^\\s*${key}\\s*=\\s*["']?(.*?)["']?\\s*$`));
+      if (match) {
+         return match[1];
+      }
+   }
+   return process.env[key] ?? '';
+};
+
+const setEnvValue = (key, value) => {
+   if (!fs.existsSync(ENV_FILE)) {
+      fs.writeFileSync(ENV_FILE, `${key}="${value}"\n`, 'utf8');
+      return;
+   }
+   const content = fs.readFileSync(ENV_FILE, 'utf8');
+   const lines = content.split('\n');
+   let found = false;
+   const newLines = lines.map(line => {
+      const match = line.match(new RegExp(`^\\s*${key}\\s*=\\s*.*`));
+      if (match) {
+         found = true;
+         return `${key}="${value}"`;
+      }
+      return line;
+   });
+   if (!found) {
+      newLines.push(`${key}="${value}"`);
+   }
+   fs.writeFileSync(ENV_FILE, newLines.join('\n'), 'utf8');
+};
+
+// GET /api/notifications/topic - Retrieve the current ntfy topic
+app.get('/api/notifications/topic', (req, res) => {
+   try {
+      const topic = getEnvValue('NTFY_TOPIC');
+      return res.json({ topic });
+   } catch (err) {
+      return res.status(500).json({ error: err.message });
+   }
+});
+
+// POST /api/notifications/topic - Save the ntfy topic and restart the api service in the background
+app.post('/api/notifications/topic', (req, res) => {
+   const { topic } = req.body ?? {};
+   if (topic === undefined) {
+      return res.status(400).json({ error: 'Topic ist erforderlich.' });
+   }
+
+   try {
+      setEnvValue('NTFY_TOPIC', topic.trim());
+      res.json({ success: true, topic: topic.trim() });
+
+      // Restart service to pick up the new env variable
+      restartServiceInBackground();
    } catch (err) {
       return res.status(500).json({ error: err.message });
    }

@@ -87,29 +87,63 @@
                </div>
             </div>
 
-            <!-- Health Config Box -->
-            <div class="glass-card" style="display:flex; flex-direction:column; justify-content:space-between;">
-               <div>
-                  <h2 style="font-size:1.2rem; font-weight:600; margin-bottom:1rem;">Systemkonfiguration</h2>
-                  <div style="display:flex; flex-direction:column; gap:0.75rem; font-size:0.9rem;">
-                     <div style="display:flex; justify-content:space-between;">
-                        <span style="color: var(--text-secondary);">MASTER_KEY:</span>
-                        <span id="config-master-key" class="account-actual-name" style="color:var(--success);">Gefunden</span>
-                     </div>
-                     <div style="display:flex; justify-content:space-between;">
-                        <span style="color: var(--text-secondary);">Actual Server URL:</span>
-                        <span id="config-ab-url" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">-</span>
-                     </div>
-                     <div style="display:flex; justify-content:space-between;">
-                        <span style="color: var(--text-secondary);">Budget Sync ID:</span>
-                        <span id="config-ab-sync" style="font-family: var(--font-mono); font-size:0.8rem;">-</span>
+            <!-- Right Column stacked cards -->
+            <div style="display:flex; flex-direction:column; gap:1.5rem;">
+               <!-- Health Config Box -->
+               <div class="glass-card" style="display:flex; flex-direction:column; justify-content:space-between; height: 100%;">
+                  <div>
+                     <h2 style="font-size:1.2rem; font-weight:600; margin-bottom:1rem;">Systemkonfiguration</h2>
+                     <div style="display:flex; flex-direction:column; gap:0.75rem; font-size:0.9rem;">
+                        <div style="display:flex; justify-content:space-between;">
+                           <span style="color: var(--text-secondary);">MASTER_KEY:</span>
+                           <span id="config-master-key" class="account-actual-name" style="color:var(--success);">Gefunden</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between;">
+                           <span style="color: var(--text-secondary);">Actual Server URL:</span>
+                           <span id="config-ab-url" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">-</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between;">
+                           <span style="color: var(--text-secondary);">Budget Sync ID:</span>
+                           <span id="config-ab-sync" style="font-family: var(--font-mono); font-size:0.8rem;">-</span>
+                        </div>
                      </div>
                   </div>
+                  
+                  <button class="btn secondary" id="git-update-btn" style="margin-top:1.5rem;">
+                     <span>🔄</span> Git Pull & API Update
+                  </button>
                </div>
-               
-               <button class="btn secondary" id="git-update-btn" style="margin-top:1.5rem;">
-                  <span>🔄</span> Git Pull & API Update
-               </button>
+
+               <!-- Push-Benachrichtigungen Box -->
+               <div class="glass-card" style="display:flex; flex-direction:column; justify-content:space-between; height: 100%;">
+                  <div>
+                     <h2 style="font-size:1.2rem; font-weight:600; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+                        <span>🔔</span> Push-Notifications
+                     </h2>
+                     <p style="color: var(--text-secondary); font-size:0.8rem; margin-bottom:1rem; line-height:1.4;">
+                        Erhalte kostenlose Push-Mitteilungen bei neuen Umsätzen direkt auf dein Smartphone via <strong>ntfy.sh</strong>.
+                     </p>
+                     <div style="display:flex; flex-direction:column; gap:0.75rem; font-size:0.9rem;">
+                        <div class="form-group" style="margin-bottom:0.25rem;">
+                           <label for="ntfy-topic-input" style="font-size:0.75rem; color: var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
+                              Geheimes Topic (ntfy.sh)
+                              <button id="btn-show-topic" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.75rem; padding:0; outline:none;">Anzeigen</button>
+                           </label>
+                           <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
+                              <input type="password" id="ntfy-topic-input" class="input-field" style="font-family: var(--font-mono); font-size:0.85rem; padding:0.4rem 0.6rem; height:36px;" placeholder="Kein Topic konfiguriert">
+                              <button class="btn secondary" id="btn-generate-topic" style="padding:0; width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-size:1rem;" title="Zufälliges Topic generieren">🎲</button>
+                           </div>
+                        </div>
+                        <div style="font-size:0.75rem; line-height:1.4; color: var(--text-muted);" id="ntfy-setup-guide">
+                           Abonniere das Topic in der iOS-App, um Push-Mitteilungen zu aktivieren.
+                        </div>
+                      </div>
+                  </div>
+                  
+                  <button class="btn secondary" id="save-ntfy-btn" style="margin-top:1.25rem;">
+                     <span>💾</span> Speichern & Aktivieren
+                  </button>
+               </div>
             </div>
          </div>
 

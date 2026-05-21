@@ -4,6 +4,7 @@ const { CredentialsStore } = require('./lib/credentials-store');
 const { maskIban } = require('./utils/mask');
 
 const parseDateRange = require('./utils/parseDateRange');
+const { sendSuccessNotification, sendFailureNotification } = require('./utils/notifications');
 
 const main = async () => {
 
@@ -116,11 +117,13 @@ const main = async () => {
 
 if (require.main === module) {
    main()
-      .then(results => {
+      .then(async results => {
          console.log(JSON.stringify(results));
+         await sendSuccessNotification(results);
       })
-      .catch(err => {
+      .catch(async err => {
          console.error('Unhandled error in main:', err);
+         await sendFailureNotification(err);
          process.exitCode = 1;
       });
 }
