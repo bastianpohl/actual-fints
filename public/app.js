@@ -57,11 +57,12 @@ document.addEventListener('DOMContentLoaded', () => {
    const inputPin = document.getElementById('bank-input-pin');
 
    // Push Notification Selectors
-   const ntfyTopicInput = document.getElementById('ntfy-topic-input');
-   const btnShowTopic = document.getElementById('btn-show-topic');
-   const btnGenerateTopic = document.getElementById('btn-generate-topic');
-   const saveNtfyBtn = document.getElementById('save-ntfy-btn');
-   const ntfySetupGuide = document.getElementById('ntfy-setup-guide');
+    const ntfyTopicInput = document.getElementById('ntfy-topic-input');
+    const ntfyServerInput = document.getElementById('ntfy-server-input');
+    const btnShowTopic = document.getElementById('btn-show-topic');
+    const btnGenerateTopic = document.getElementById('btn-generate-topic');
+    const saveNtfyBtn = document.getElementById('save-ntfy-btn');
+    const ntfySetupGuide = document.getElementById('ntfy-setup-guide');
 
    // Hide running spinner initially
    syncRunningSpinner.style.visibility = 'hidden';
@@ -577,30 +578,32 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- PUSH NOTIFICATION HANDLERS ---
-    const updateNtfySetupGuide = (topic) => {
+    const updateNtfySetupGuide = (topic, server) => {
        if (!topic) {
           ntfySetupGuide.innerHTML = 'Kein Push-Topic konfiguriert. Generiere eines, um Benachrichtigungen zu aktivieren.';
           return;
        }
-       const url = `https://ntfy.sh/${topic}`;
+       const base = server ? (server.endsWith('/') ? server.slice(0, -1) : server) : 'https://ntfy.sh';
+       const url = `${base}/${topic}`;
        ntfySetupGuide.innerHTML = `Abonniere das Topic in der ntfy-App:<br><a href="${url}" target="_blank" style="color:var(--primary); text-decoration:underline; font-family:var(--font-mono); word-break:break-all; font-size: 0.8rem; display: inline-block; margin-top: 0.25rem;">${topic}</a>`;
     };
 
     const loadNtfyTopic = async () => {
        try {
-          const res = await fetch('/api/notifications/topic');
+          const res = await fetch('/api/notifications/config');
           if (res.ok) {
              const data = await res.json();
+             ntfyServerInput.value = data.server || '';
              if (data.topic) {
                 ntfyTopicInput.value = data.topic;
-                updateNtfySetupGuide(data.topic);
+                updateNtfySetupGuide(data.topic, data.server);
              } else {
                 ntfyTopicInput.value = '';
-                updateNtfySetupGuide('');
+                updateNtfySetupGuide('', data.server);
              }
           }
        } catch (err) {
-          console.error('Error fetching ntfy topic:', err);
+          console.error('Error fetching ntfy config:', err);
        }
     };
 
@@ -626,7 +629,7 @@ document.addEventListener('DOMContentLoaded', () => {
           ntfyTopicInput.value = secureTopic;
           ntfyTopicInput.type = 'text';
           if (btnShowTopic) btnShowTopic.textContent = 'Verbergen';
-          updateNtfySetupGuide(secureTopic);
+          updateNtfySetupGuide(secureTopic, ntfyServerInput.value.trim());
           showToast('Zufälliges Topic generiert. Vergiss nicht zu speichern!', 'success');
        });
     }
@@ -635,28 +638,29 @@ document.addEventListener('DOMContentLoaded', () => {
        saveNtfyBtn.addEventListener('click', async (e) => {
           e.preventDefault();
           const topic = ntfyTopicInput.value.trim();
+          const server = ntfyServerInput.value.trim() || 'https://ntfy.sh';
           
           try {
              saveNtfyBtn.disabled = true;
              saveNtfyBtn.innerHTML = '<span>⏳</span> Speichern...';
              
-             const res = await fetch('/api/notifications/topic', {
+             const res = await fetch('/api/notifications/config', {
                 method: 'POST',
                 headers: {
                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ topic })
+                body: JSON.stringify({ topic, server })
              });
              
              if (res.ok) {
-                showToast('Push-Topic erfolgreich gespeichert und API neu gestartet!', 'success');
-                updateNtfySetupGuide(topic);
+                showToast('Push-Konfiguration erfolgreich gespeichert und API neu gestartet!', 'success');
+                updateNtfySetupGuide(topic, server);
              } else {
                 const errData = await res.json();
-                showToast(errData.error || 'Fehler beim Speichern des Topics.', 'error');
+                showToast(errData.error || 'Fehler beim Speichern der Konfiguration.', 'error');
              }
           } catch (err) {
-             showToast('Netzwerkfehler beim Speichern des Topics.', 'error');
+             showToast('Netzwerkfehler beim Speichern der Konfiguration.', 'error');
           } finally {
              saveNtfyBtn.disabled = false;
              saveNtfyBtn.innerHTML = '<span>💾</span> Speichern & Aktivieren';

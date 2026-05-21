@@ -232,28 +232,30 @@ const setEnvValue = (key, value) => {
    fs.writeFileSync(ENV_FILE, newLines.join('\n'), 'utf8');
 };
 
-// GET /api/notifications/topic - Retrieve the current ntfy topic
-app.get('/api/notifications/topic', (req, res) => {
+// GET /api/notifications/config - Retrieve the current ntfy config
+app.get('/api/notifications/config', (req, res) => {
    try {
       const topic = getEnvValue('NTFY_TOPIC');
-      return res.json({ topic });
+      const server = getEnvValue('NTFY_SERVER') || 'https://ntfy.sh';
+      return res.json({ topic, server });
    } catch (err) {
       return res.status(500).json({ error: err.message });
    }
 });
 
-// POST /api/notifications/topic - Save the ntfy topic and restart the api service in the background
-app.post('/api/notifications/topic', (req, res) => {
-   const { topic } = req.body ?? {};
-   if (topic === undefined) {
-      return res.status(400).json({ error: 'Topic ist erforderlich.' });
+// POST /api/notifications/config - Save the ntfy config and restart the api service in the background
+app.post('/api/notifications/config', (req, res) => {
+   const { topic, server } = req.body ?? {};
+   if (topic === undefined || server === undefined) {
+      return res.status(400).json({ error: 'Topic und Server-URL sind erforderlich.' });
    }
 
    try {
       setEnvValue('NTFY_TOPIC', topic.trim());
-      res.json({ success: true, topic: topic.trim() });
+      setEnvValue('NTFY_SERVER', server.trim());
+      res.json({ success: true, topic: topic.trim(), server: server.trim() });
 
-      // Restart service to pick up the new env variable
+      // Restart service to pick up the new env variables
       restartServiceInBackground();
    } catch (err) {
       return res.status(500).json({ error: err.message });

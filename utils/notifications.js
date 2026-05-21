@@ -1,4 +1,5 @@
 const ntfyTopic = process.env.NTFY_TOPIC;
+const ntfyServer = process.env.NTFY_SERVER || 'https://ntfy.sh';
 
 /**
  * Formats a transaction amount stored in cents back to EUR string.
@@ -37,7 +38,8 @@ async function sendNtfy(title, message, tags = '', priority = 'default') {
       return;
    }
 
-   const url = `https://ntfy.sh/${ntfyTopic}`;
+   const serverBase = ntfyServer.endsWith('/') ? ntfyServer.slice(0, -1) : ntfyServer;
+   const url = `${serverBase}/${ntfyTopic}`;
 
    try {
       const response = await fetch(url, {
