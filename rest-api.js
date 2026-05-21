@@ -270,6 +270,21 @@ app.put('/api/update/config', async (req, res) => {
 
 const HOST = process.env.HOST ?? '127.0.0.1';
 const PORT = process.env.PORT ?? 3000;
-app.listen(PORT, HOST, () => {
-   console.log(`REST API listening on http://${HOST}:${PORT}`);
-});
+
+const certPath = process.env.HTTPS_CERT_PATH;
+const keyPath = process.env.HTTPS_KEY_PATH;
+
+if (certPath && keyPath && fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+   const https = require('node:https');
+   const options = {
+      cert: fs.readFileSync(certPath),
+      key: fs.readFileSync(keyPath)
+   };
+   https.createServer(options, app).listen(PORT, HOST, () => {
+      console.log(`REST API listening securely on https://${HOST}:${PORT}`);
+   });
+} else {
+   app.listen(PORT, HOST, () => {
+      console.log(`REST API listening on http://${HOST}:${PORT}`);
+   });
+}
