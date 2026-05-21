@@ -72,6 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCopyServer = document.getElementById('btn-copy-server');
     const btnSwitchToEdit = document.getElementById('btn-switch-to-edit');
     const btnCancelEdit = document.getElementById('btn-cancel-edit');
+    const btnTestPush = document.getElementById('btn-test-push');
 
    // Hide running spinner initially
    syncRunningSpinner.style.visibility = 'hidden';
@@ -740,8 +741,33 @@ document.addEventListener('DOMContentLoaded', () => {
           }
        });
     }
+     if (btnTestPush) {
+        btnTestPush.addEventListener('click', async (e) => {
+           e.preventDefault();
+           try {
+              btnTestPush.disabled = true;
+              btnTestPush.innerHTML = '<span>⏳</span> Sendet...';
+              
+              const res = await fetch('/api/notifications/test', {
+                 method: 'POST'
+              });
+              
+              if (res.ok) {
+                 showToast('Test-Push erfolgreich gesendet! 🔔', 'success');
+              } else {
+                 const errData = await res.json();
+                 showToast(errData.error || 'Fehler beim Senden des Test-Pushes.', 'error');
+              }
+           } catch (err) {
+              showToast('Netzwerkfehler beim Senden des Test-Pushes.', 'error');
+           } finally {
+              btnTestPush.disabled = false;
+              btnTestPush.innerHTML = '<span>🔔</span> Testen';
+           }
+        });
+     }
 
-    // --- INITIAL LOADING ---
+     // --- INITIAL LOADING ---
     loadStatus();
     loadNtfyTopic();
 

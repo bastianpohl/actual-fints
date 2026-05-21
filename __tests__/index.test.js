@@ -181,3 +181,60 @@ test('requireEnv returns object with existing variables', () => {
   });
 });
 
+test('sendNtfy throws error on non-ok HTTP response', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = async (url, options) => {
+    return {
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      text: async () => 'Topic not found'
+    };
+  };
+
+  const { sendNtfy } = require('../utils/notifications');
+  await assert.rejects(
+     () => sendNtfy('Title', 'Message', 'tags', 'default', 'test-topic', 'https://ntfy.sh'),
+     /HTTP 404/
+  );
+});
+
+test('sendNtfy passes correct headers and encodes Unicode correctly', async (t) => {
+  const originalFetch = globalThis.fetch;
+  let fetchCalled = false;
+  let passedUrl = '';
+  let passedHeaders = {};
+  let passedBody = '';
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = async (url, options) => {
+    fetchCalled = true;
+    passedUrl = url;
+    passedHeaders = options.headers;
+    passedBody = options.body;
+    return {
+      ok: true,
+      status: 200,
+      text: async () => 'OK'
+    };
+  };
+
+  const { sendNtfy } = require('../utils/notifications');
+  await sendNtfy('Hallo Welt! 🎉', 'Dies ist eine Testnachricht.', 'sparkles', 'high', 'my-topic', 'https://my.ntfy.server');
+
+  assert.equal(fetchCalled, true);
+  assert.equal(passedUrl, 'https://my.ntfy.server/my-topic');
+  assert.equal(passedHeaders['Priority'], 'high');
+  // Unicode/emoji title must be RFC 2047 MIME encoded
+  assert.equal(passedHeaders['Title'].startsWith('=?utf-8?B?'), true);
+  assert.equal(passedBody, 'Dies ist eine Testnachricht.');
+});
+
+

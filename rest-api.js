@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const { CredentialsStore } = require('./lib/credentials-store');
+const { sendNtfy } = require('./utils/notifications');
 
 const app = express();
 app.use(express.json());
@@ -268,6 +269,43 @@ app.post('/api/notifications/config', (req, res) => {
       return res.status(500).json({ error: err.message });
    } finally {
       store.close();
+   }
+});
+
+// POST /api/notifications/test - Trigger a test notification
+app.post('/api/notifications/test', async (req, res) => {
+   const masterKey = process.env.MASTER_KEY;
+   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht gesetzt.' });
+
+   const store = new CredentialsStore(masterKey);
+   let topic = '';
+   let server = 'https://ntfy.sh';
+   try {
+      topic = store.getConfig('ntfy_topic');
+      server = store.getConfig('ntfy_server') || 'https://ntfy.sh';
+   } catch (err) {
+      return res.status(500).json({ error: err.message });
+   } finally {
+      store.close();
+   }
+
+   if (!topic) {
+      return res.status(400).json({ error: 'Es ist noch kein Push-Topic konfiguriert.' });
+   }
+
+   try {
+      const timestamp = new Date().toLocaleString('de-DE');
+      await sendNtfy(
+         'Test-Push erfolgreich! 🎉',
+         `Deine Push-Benachrichtigungen für actual-fints wurden erfolgreich konfiguriert.\n\nUhrzeit: ${timestamp}`,
+         'tada,sparkles,iphone',
+         'default',
+         topic,
+         server
+      );
+      return res.json({ success: true });
+   } catch (err) {
+      return res.status(500).json({ error: err.message });
    }
 });
 

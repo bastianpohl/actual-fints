@@ -52,37 +52,33 @@ async function sendNtfy(title, message, tags = '', priority = 'default', overrid
    const server = overrideServer ?? ntfyServer;
 
    if (!topic) {
-      console.error('Push-Notification übersprungen: ntfy Topic ist nicht definiert.');
-      return;
+      throw new Error('Push-Notification übersprungen: ntfy Topic ist nicht definiert.');
    }
 
    const serverBase = server.endsWith('/') ? server.slice(0, -1) : server;
    const url = `${serverBase}/${topic}`;
 
-   try {
-      const headers = {
-         'Priority': priority,
-         'Content-Type': 'text/plain; charset=utf-8'
-      };
+   const headers = {
+      'Priority': priority,
+      'Content-Type': 'text/plain; charset=utf-8'
+   };
 
-      if (title) {
-         headers['Title'] = encodeHeaderValue(title);
-      }
-      if (tags) {
-         headers['Tags'] = encodeHeaderValue(tags);
-      }
+   if (title) {
+      headers['Title'] = encodeHeaderValue(title);
+   }
+   if (tags) {
+      headers['Tags'] = encodeHeaderValue(tags);
+   }
 
-      const response = await fetch(url, {
-         method: 'POST',
-         headers,
-         body: message
-      });
+   const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: message
+   });
 
-      if (!response.ok) {
-         console.error(`Fehler beim Senden der Push-Benachrichtigung: HTTP ${response.status}`);
-      }
-   } catch (error) {
-      console.error('Fehler bei der Push-Benachrichtigungs-Übertragung:', error.message);
+   if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      throw new Error(`Fehler beim Senden der Push-Benachrichtigung: HTTP ${response.status}${errText ? ` - ${errText}` : ''}`);
    }
 }
 
@@ -130,7 +126,11 @@ async function sendSuccessNotification(results, overrideTopic = null, overrideSe
       message = 'Alle Konten sind auf dem neuesten Stand. Keine neuen Umsätze gefunden.';
    }
 
-   await sendNtfy(title, message, tags, priority, overrideTopic, overrideServer);
+   try {
+      await sendNtfy(title, message, tags, priority, overrideTopic, overrideServer);
+   } catch (error) {
+      console.error('Fehler bei der Push-Benachrichtigungs-Übertragung:', error.message);
+   }
 }
 
 /**
@@ -149,10 +149,15 @@ async function sendFailureNotification(error, overrideTopic = null, overrideServ
 Fehlermeldung:
 ${error?.message || error || 'Unbekannter Fehler'}`;
 
-   await sendNtfy(title, message, tags, priority, overrideTopic, overrideServer);
+   try {
+      await sendNtfy(title, message, tags, priority, overrideTopic, overrideServer);
+   } catch (error) {
+      console.error('Fehler bei der Push-Benachrichtigungs-Übertragung:', error.message);
+   }
 }
 
 module.exports = {
    sendSuccessNotification,
-   sendFailureNotification
+   sendFailureNotification,
+   sendNtfy
 };
