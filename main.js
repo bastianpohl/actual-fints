@@ -26,6 +26,19 @@ const main = async () => {
    let banks;
    let actualConfig = {};
    try {
+      // Automatic migration of Actual Budget credentials from .env to SQLite if not already migrated
+      const dbUrl = store.getConfig('actual_server_url');
+      if (!dbUrl && process.env.AB_URL && process.env.AB_PASS && process.env.AB_SYNC_DB) {
+         console.error('🔄 [Migration] Migriere Actual Budget Verbindungsdaten aus .env in die SQLite-Datenbank...');
+         store.setConfig('actual_server_url', process.env.AB_URL.trim());
+         store.setConfig('actual_sync_db', process.env.AB_SYNC_DB.trim());
+         store.setEncryptedConfig('actual_password', process.env.AB_PASS.trim());
+         if (process.env.AB_PATH) {
+            store.setConfig('actual_data_dir', process.env.AB_PATH.trim());
+         }
+         console.error('✅ [Migration] Actual Budget Verbindungsdaten erfolgreich und verschlüsselt in SQLite importiert!');
+      }
+
       banks = store.getAllBanks();
       actualConfig = {
          serverUrl: store.getConfig('actual_server_url') || process.env.AB_URL,

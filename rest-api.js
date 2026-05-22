@@ -445,6 +445,29 @@ app.put('/api/update/config', async (req, res) => {
    }
 });
 
+// Automatic migration of Actual Budget credentials from .env to SQLite if not already migrated
+const masterKey = process.env.MASTER_KEY;
+if (masterKey) {
+   const store = new CredentialsStore(masterKey);
+   try {
+      const dbUrl = store.getConfig('actual_server_url');
+      if (!dbUrl && process.env.AB_URL && process.env.AB_PASS && process.env.AB_SYNC_DB) {
+         console.log('🔄 [Migration] Migriere Actual Budget Verbindungsdaten aus .env in die SQLite-Datenbank...');
+         store.setConfig('actual_server_url', process.env.AB_URL.trim());
+         store.setConfig('actual_sync_db', process.env.AB_SYNC_DB.trim());
+         store.setEncryptedConfig('actual_password', process.env.AB_PASS.trim());
+         if (process.env.AB_PATH) {
+            store.setConfig('actual_data_dir', process.env.AB_PATH.trim());
+         }
+         console.log('✅ [Migration] Actual Budget Verbindungsdaten erfolgreich und verschlüsselt in SQLite importiert!');
+      }
+   } catch (err) {
+      console.error('❌ [Migration] Fehler bei der automatischen Actual Budget Migration:', err.message);
+   } finally {
+      store.close();
+   }
+}
+
 const HOST = process.env.HOST ?? '127.0.0.1';
 const PORT = process.env.PORT ?? 3000;
 
