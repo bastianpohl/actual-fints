@@ -446,7 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gitUpdateBtn.disabled = false;
          }, 5000);
       }
-   };
+   });
 
    let actualAccounts = [];
    const loadActualAccounts = async () => {
