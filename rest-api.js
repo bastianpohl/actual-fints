@@ -299,9 +299,17 @@ app.get('/api/budget/config', (req, res) => {
 
    const store = new CredentialsStore(masterKey);
    try {
-      const url = store.getConfig('actual_server_url') || '';
-      const syncDb = store.getConfig('actual_sync_db') || '';
-      const hasPassword = !!store.getEncryptedConfig('actual_password');
+      let url = store.getConfig('actual_server_url') || '';
+      let syncDb = store.getConfig('actual_sync_db') || '';
+      let hasPassword = !!store.getEncryptedConfig('actual_password');
+
+      // Fallback to process.env variables if database entries are not yet populated
+      if (!url && !syncDb && !hasPassword) {
+         url = process.env.AB_URL || '';
+         syncDb = process.env.AB_SYNC_DB || '';
+         hasPassword = !!process.env.AB_PASS;
+      }
+
       return res.json({ url, syncDb, hasPassword });
    } catch (err) {
       return res.status(500).json({ error: err.message });
