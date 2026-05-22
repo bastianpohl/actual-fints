@@ -1202,30 +1202,46 @@ header {
 }
 
 /* Fixes/Improvements for general Material Icons inside buttons and cards */
-.status-icon-md {
+.status-circle {
    width: 48px;
    height: 48px;
    border-radius: 50%;
    display: flex;
    align-items: center;
    justify-content: center;
-   font-size: 1.5rem !important;
+   flex-shrink: 0;
+   transition: background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
-.status-icon-md.success {
+.status-circle.success {
    background: rgba(16, 185, 129, 0.1);
    color: var(--success);
    border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
-.status-icon-md.warning {
+.status-circle.warning {
    background: rgba(245, 158, 11, 0.1);
    color: var(--warning);
    border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
-.status-icon-md.danger {
+.status-circle.danger {
    background: rgba(239, 68, 68, 0.1);
    color: var(--danger);
    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.status-circle .material-icons {
+   font-size: 1.5rem !important;
+}
+
+/* Toggle Date Options Button */
+#toggle-date-options {
+   transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+#toggle-date-options:hover {
+   color: var(--text-primary);
+   border-color: var(--accent-primary) !important;
+   background: var(--nav-hover-bg);
 }

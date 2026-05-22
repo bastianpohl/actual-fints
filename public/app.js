@@ -21,10 +21,13 @@ document.addEventListener('DOMContentLoaded', () => {
    // Status Elements
    const statusActualIcon = document.getElementById('status-actual-icon');
    const statusActualText = document.getElementById('status-actual-text');
+   const statusActualCircle = document.getElementById('status-actual-circle');
    const statusDbIcon = document.getElementById('status-db-icon');
    const statusDbText = document.getElementById('status-db-text');
+   const statusDbCircle = document.getElementById('status-db-circle');
    const statusSyncIcon = document.getElementById('status-sync-icon');
    const statusSyncText = document.getElementById('status-sync-text');
+   const statusSyncCircle = document.getElementById('status-sync-circle');
 
    const configMasterKey = document.getElementById('config-master-key');
    const configAbUrl = document.getElementById('config-ab-url');
@@ -83,12 +86,33 @@ document.addEventListener('DOMContentLoaded', () => {
    // Hide running spinner initially
    syncRunningSpinner.style.visibility = 'hidden';
 
-   // Wire up close button for sync results
-   if (closeSyncResultsBtn) {
-      closeSyncResultsBtn.addEventListener('click', () => {
-         syncResultsCard.style.display = 'none';
-      });
-   }
+    // Wire up close button for sync results
+    if (closeSyncResultsBtn) {
+       closeSyncResultsBtn.addEventListener('click', () => {
+          syncResultsCard.style.display = 'none';
+       });
+    }
+
+    // Wire up collapsible date options
+    const toggleDateOptions = document.getElementById('toggle-date-options');
+    const dateOptionsContainer = document.getElementById('date-options-container');
+    const dateToggleIcon = document.getElementById('date-toggle-icon');
+
+    if (toggleDateOptions && dateOptionsContainer) {
+       toggleDateOptions.addEventListener('click', (e) => {
+          e.preventDefault();
+          const isHidden = dateOptionsContainer.style.display === 'none';
+          if (isHidden) {
+             dateOptionsContainer.style.display = 'block';
+             if (dateToggleIcon) dateToggleIcon.style.transform = 'rotate(180deg)';
+             toggleDateOptions.style.borderColor = 'var(--accent-primary)';
+          } else {
+             dateOptionsContainer.style.display = 'none';
+             if (dateToggleIcon) dateToggleIcon.style.transform = 'rotate(0deg)';
+             toggleDateOptions.style.borderColor = 'var(--input-border)';
+          }
+       });
+    }
 
    // --- TOAST NOTIFICATIONS ---
    const showToast = (message, type = 'success') => {
@@ -141,54 +165,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
    // --- API INTEGRATION ---
 
-   // 1. Fetch System Status
-   const loadStatus = async () => {
-      try {
-         const res = await fetch('/api/status');
-         const data = await res.json();
-
-         // Update Actual Budget Badge
-         if (data.actualBudgetConfigured) {
-            statusActualIcon.className = 'material-icons status-icon-md success';
-            statusActualIcon.textContent = 'check_circle';
-            statusActualText.textContent = 'Bereit';
-         } else {
-            statusActualIcon.className = 'material-icons status-icon-md danger';
-            statusActualIcon.textContent = 'error';
-            statusActualText.textContent = 'Konfig-Fehler';
-         }
-
-         // Mapped banks badge
-         statusDbText.textContent = `${data.bankCount} Banken (${data.accountCount} Konten)`;
-         if (data.bankCount > 0) {
-            statusDbIcon.className = 'material-icons status-icon-md success';
-            statusDbIcon.textContent = 'account_balance';
-         } else {
-            statusDbIcon.className = 'material-icons status-icon-md warning';
-            statusDbIcon.textContent = 'help_outline';
-         }
-
-         // Last sync badge
-         if (data.lastSync) {
-            const lastSyncDate = new Date(data.lastSync);
-            statusSyncText.textContent = lastSyncDate.toLocaleString('de-DE');
-         } else {
-            statusSyncText.textContent = 'Nie';
-         }
-
-         // Populate System info block
-         configMasterKey.textContent = data.masterKeyConfigured ? 'Konfiguriert (AES-GCM)' : 'Fehlt';
-         configMasterKey.style.color = data.masterKeyConfigured ? 'var(--success)' : 'var(--danger)';
-
-         // Fetch direct env configs for dashboard if available
-         // For security we mask URL and Sync DB mildly but show status
-         fetchBanksMeta();
-
-      } catch (err) {
-         console.error('Error fetching status:', err);
-         showToast('System-Status konnte nicht geladen werden.', 'error');
-      }
-   };
+    // 1. Fetch System Status
+    const loadStatus = async () => {
+       try {
+          const res = await fetch('/api/status');
+          const data = await res.json();
+ 
+          // Update Actual Budget Badge
+          if (data.actualBudgetConfigured) {
+             if (statusActualCircle) statusActualCircle.className = 'status-circle success';
+             statusActualIcon.textContent = 'check_circle';
+             statusActualText.textContent = 'Bereit';
+          } else {
+             if (statusActualCircle) statusActualCircle.className = 'status-circle danger';
+             statusActualIcon.textContent = 'error';
+             statusActualText.textContent = 'Konfig-Fehler';
+          }
+ 
+          // Mapped banks badge
+          statusDbText.textContent = `${data.bankCount} Banken (${data.accountCount} Konten)`;
+          if (data.bankCount > 0) {
+             if (statusDbCircle) statusDbCircle.className = 'status-circle success';
+             statusDbIcon.textContent = 'account_balance';
+          } else {
+             if (statusDbCircle) statusDbCircle.className = 'status-circle warning';
+             statusDbIcon.textContent = 'help_outline';
+          }
+ 
+          // Last sync badge
+          if (data.lastSync) {
+             const lastSyncDate = new Date(data.lastSync);
+             statusSyncText.textContent = lastSyncDate.toLocaleString('de-DE');
+          } else {
+             statusSyncText.textContent = 'Nie';
+          }
+ 
+          // Populate System info block
+          configMasterKey.textContent = data.masterKeyConfigured ? 'Konfiguriert (AES-GCM)' : 'Fehlt';
+          configMasterKey.style.color = data.masterKeyConfigured ? 'var(--success)' : 'var(--danger)';
+ 
+          // Fetch direct env configs for dashboard if available
+          // For security we mask URL and Sync DB mildly but show status
+          fetchBanksMeta();
+ 
+       } catch (err) {
+          console.error('Error fetching status:', err);
+          showToast('System-Status konnte nicht geladen werden.', 'error');
+       }
+    };
 
    // Helper to extract system env data for the info card
    const fetchBanksMeta = async () => {

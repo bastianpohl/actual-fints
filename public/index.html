@@ -50,21 +50,27 @@
          <!-- Status Summary Cards -->
          <div class="status-grid">
             <div class="glass-card status-badge">
-               <span class="material-icons status-icon-md success" id="status-actual-icon">check_circle</span>
+               <div class="status-circle success" id="status-actual-circle">
+                  <span class="material-icons" id="status-actual-icon">check_circle</span>
+               </div>
                <div class="status-details">
                   <h3>Actual Budget</h3>
                   <p id="status-actual-text">Verbinde...</p>
                </div>
             </div>
             <div class="glass-card status-badge">
-               <span class="material-icons status-icon-md success" id="status-db-icon">account_balance</span>
+               <div class="status-circle success" id="status-db-circle">
+                  <span class="material-icons" id="status-db-icon">account_balance</span>
+               </div>
                <div class="status-details">
                   <h3>Banken & Konten</h3>
                   <p id="status-db-text">0 Banken (0 Konten)</p>
                </div>
             </div>
             <div class="glass-card status-badge">
-               <span class="material-icons status-icon-md success" id="status-sync-icon">schedule</span>
+               <div class="status-circle success" id="status-sync-circle">
+                  <span class="material-icons" id="status-sync-icon">schedule</span>
+               </div>
                <div class="status-details">
                   <h3>Letzter Sync</h3>
                   <p id="status-sync-text">Nie</p>
@@ -85,14 +91,21 @@
                   Lade Umsätze via FinTS ab und importiere sie vollautomatisch direkt in deine Actual Budget Konten. 
                </p>
 
-               <div class="date-inputs">
-                  <div class="form-group">
-                     <label for="sync-start-date">Startdatum (Optional)</label>
-                     <input type="date" id="sync-start-date" class="input-field">
-                  </div>
-                  <div class="form-group">
-                     <label for="sync-end-date">Enddatum (Optional)</label>
-                     <input type="date" id="sync-end-date" class="input-field">
+               <button type="button" class="btn secondary" id="toggle-date-options" style="font-size: 0.85rem; padding: 0.4rem 0.8rem; display: inline-flex; align-items: center; gap: 0.35rem; width: auto; margin-bottom: 0.5rem; background: transparent; border: 1px dashed var(--input-border);">
+                  <span class="material-icons" id="date-toggle-icon" style="font-size: 1.1rem; transition: transform var(--transition-fast);">expand_more</span>
+                  <span>Zeitraum eingrenzen (Optional)</span>
+               </button>
+
+               <div class="collapsible-date-container" id="date-options-container" style="display: none; transition: max-height var(--transition-normal) ease-out; overflow: hidden; margin-bottom: 0.5rem;">
+                  <div class="date-inputs" style="padding: 0.25rem 0 0.5rem 0;">
+                     <div class="form-group">
+                        <label for="sync-start-date">Startdatum</label>
+                        <input type="date" id="sync-start-date" class="input-field">
+                     </div>
+                     <div class="form-group">
+                        <label for="sync-end-date">Enddatum</label>
+                        <input type="date" id="sync-end-date" class="input-field">
+                     </div>
                   </div>
                </div>
 
