@@ -88,6 +88,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCancelEdit = document.getElementById('btn-cancel-edit');
     const btnTestPush = document.getElementById('btn-test-push');
 
+    // PWA Web-Push Selectors
+    const settingsPushStatus = document.getElementById('settings-push-status');
+    const pwaPushIosNote = document.getElementById('pwa-push-ios-note');
+    const pwaPushDevicesContainer = document.getElementById('pwa-push-devices-container');
+    const settingsPushDeviceName = document.getElementById('settings-push-device-name');
+    const btnPwaPushSubscribe = document.getElementById('btn-pwa-push-subscribe');
+    const btnPwaPushUnsubscribe = document.getElementById('btn-pwa-push-unsubscribe');
+    const btnPwaPushTest = document.getElementById('btn-pwa-push-test');
+    const pwaPushUnregisteredActions = document.getElementById('pwa-push-unregistered-actions');
+    const pwaPushRegisteredActions = document.getElementById('pwa-push-registered-actions');
+
    // Hide running spinner initially
    syncRunningSpinner.style.visibility = 'hidden';
 
@@ -164,6 +175,10 @@ document.addEventListener('DOMContentLoaded', () => {
             loadLogs();
          } else if (targetTab === 'dashboard' || targetTab === 'settings') {
             loadStatus();
+            if (targetTab === 'settings') {
+               loadPushStatus();
+               loadPushSubscriptions();
+            }
          }
       });
    });
@@ -915,6 +930,327 @@ document.addEventListener('DOMContentLoaded', () => {
         });
      }
 
+     // --- PWA WEB-PUSH HANDLERS ---
+     function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding)
+           .replace(/\-/g, '+')
+           .replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+           outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+     }
+
+     function detectPlatform() {
+        const ua = navigator.userAgent.toLowerCase();
+        if (/ipad|iphone|ipod/.test(ua) && !window.MSStream) return 'iOS';
+        if (/android/.test(ua)) return 'Android';
+        if (/macintosh|mac os x/.test(ua)) return 'macOS';
+        if (/windows|win32/.test(ua)) return 'Windows';
+        if (/linux/.test(ua)) return 'Linux';
+        return 'Browser';
+     }
+
+     function checkPwaPushSupport() {
+        const isPushSupported = 'serviceWorker' in navigator && 'PushManager' in window;
+        const ua = navigator.userAgent;
+        const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+        const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+
+        if (isIOS && !isStandalone) {
+           if (pwaPushIosNote) pwaPushIosNote.style.display = 'block';
+        } else {
+           if (pwaPushIosNote) pwaPushIosNote.style.display = 'none';
+        }
+
+        return isPushSupported;
+     }
+
+     async function loadPushStatus() {
+        if (!checkPwaPushSupport()) {
+           if (settingsPushStatus) {
+              settingsPushStatus.textContent = 'Nicht unterstützt';
+              settingsPushStatus.style.color = 'var(--text-muted)';
+              settingsPushStatus.style.background = 'rgba(255, 255, 255, 0.05)';
+              settingsPushStatus.style.border = '1px solid rgba(255, 255, 255, 0.08)';
+           }
+           if (pwaPushUnregisteredActions) pwaPushUnregisteredActions.style.display = 'none';
+           if (pwaPushRegisteredActions) pwaPushRegisteredActions.style.display = 'none';
+           return;
+        }
+
+        try {
+           const reg = await navigator.serviceWorker.ready;
+           const sub = await reg.pushManager.getSubscription();
+           
+           if (sub) {
+              if (settingsPushStatus) {
+                 settingsPushStatus.textContent = 'Aktiviert';
+                 settingsPushStatus.style.color = 'var(--success)';
+                 settingsPushStatus.style.background = 'rgba(16, 185, 129, 0.1)';
+                 settingsPushStatus.style.border = '1px solid rgba(16, 185, 129, 0.25)';
+              }
+              if (pwaPushUnregisteredActions) pwaPushUnregisteredActions.style.display = 'none';
+              if (pwaPushRegisteredActions) pwaPushRegisteredActions.style.display = 'flex';
+           } else {
+              if (settingsPushStatus) {
+                 settingsPushStatus.textContent = 'Deaktiviert';
+                 settingsPushStatus.style.color = 'var(--text-muted)';
+                 settingsPushStatus.style.background = 'rgba(255, 255, 255, 0.05)';
+                 settingsPushStatus.style.border = '1px solid rgba(255, 255, 255, 0.08)';
+              }
+              if (pwaPushUnregisteredActions) pwaPushUnregisteredActions.style.display = 'flex';
+              if (pwaPushRegisteredActions) pwaPushRegisteredActions.style.display = 'none';
+           }
+        } catch (err) {
+           console.error('Error getting push subscription status:', err);
+        }
+     }
+
+     async function loadPushSubscriptions() {
+        if (!pwaPushDevicesContainer) return;
+        try {
+           const res = await fetch('/api/auth/push-subscriptions');
+           if (!res.ok) return;
+           const subscriptions = await res.json();
+           
+           if (subscriptions.length === 0) {
+              pwaPushDevicesContainer.innerHTML = `
+                 <div style="font-size:0.8rem; color:var(--text-muted); font-style:italic; text-align:center; padding: 0.5rem 0; border: 1px dashed var(--display-border); border-radius: 8px;">
+                    Keine Geräte abonniert
+                 </div>
+              `;
+              return;
+           }
+           
+           pwaPushDevicesContainer.innerHTML = subscriptions.map(sub => {
+              const dateStr = new Date(sub.createdAt).toLocaleDateString('de-DE', {
+                 day: '2-digit',
+                 month: '2-digit',
+                 year: 'numeric',
+                 hour: '2-digit',
+                 minute: '2-digit'
+              });
+              
+              let platformIcon = 'computer';
+              const p = sub.platform ? sub.platform.toLowerCase() : '';
+              if (p.includes('iphone') || p.includes('ios') || p.includes('ipod') || p.includes('ipad')) {
+                 platformIcon = 'phone_iphone';
+              } else if (p.includes('android')) {
+                 platformIcon = 'phone_android';
+              }
+              
+              return `
+                 <div style="display:flex; justify-content:space-between; align-items:center; background:var(--display-bg); border:1px solid var(--display-border); padding:0.5rem 0.75rem; border-radius:8px; gap:0.5rem;">
+                    <div style="display:flex; align-items:center; gap:0.5rem; min-width:0; text-align:left;">
+                       <span class="material-icons" style="font-size:1.2rem; color:var(--text-muted); flex-shrink:0;">${platformIcon}</span>
+                       <div style="display:flex; flex-direction:column; gap:0.15rem; min-width:0;">
+                          <span style="font-size:0.85rem; font-weight:500; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${escapeHtml(sub.deviceName)}</span>
+                          <span style="font-size:0.7rem; color:var(--text-muted);">${dateStr}</span>
+                       </div>
+                    </div>
+                    <button class="btn secondary btn-delete-push" data-endpoint="${escapeHtml(sub.endpoint)}" style="padding:0; width:28px; height:28px; display:flex; align-items:center; justify-content:center; flex-shrink:0; color:var(--danger); border-color:rgba(239, 68, 68, 0.2); background:transparent;" title="Abonnement löschen">
+                       <span class="material-icons" style="font-size:1rem;">delete</span>
+                    </button>
+                 </div>
+              `;
+           }).join('');
+           
+           // Wire delete button listeners
+           pwaPushDevicesContainer.querySelectorAll('.btn-delete-push').forEach(btn => {
+              btn.addEventListener('click', async (e) => {
+                 e.preventDefault();
+                 const endpoint = btn.getAttribute('data-endpoint');
+                 if (confirm('Dieses Abonnement wirklich löschen?')) {
+                    try {
+                       btn.disabled = true;
+                       const res = await fetch('/api/auth/push-unsubscribe', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ endpoint })
+                       });
+                       if (res.ok) {
+                          showToast('Abonnement erfolgreich gelöscht.', 'success');
+                          
+                          // Check if we deleted our own local subscription
+                          if ('serviceWorker' in navigator && 'PushManager' in window) {
+                             const reg = await navigator.serviceWorker.ready;
+                             const sub = await reg.pushManager.getSubscription();
+                             if (sub && sub.endpoint === endpoint) {
+                                await sub.unsubscribe();
+                             }
+                          }
+                          
+                          loadPushStatus();
+                          loadPushSubscriptions();
+                       } else {
+                          const errData = await res.json();
+                          showToast(errData.error || 'Fehler beim Löschen des Abonnements.', 'error');
+                       }
+                    } catch (err) {
+                       console.error('Error unsubscribing device:', err);
+                       showToast('Netzwerk- oder Serverfehler beim Löschen.', 'error');
+                    } finally {
+                       btn.disabled = false;
+                    }
+                 }
+              });
+           });
+           
+        } catch (err) {
+           console.error('Error loading push subscriptions:', err);
+        }
+     }
+
+     async function handlePushSubscribe() {
+        if (!checkPwaPushSupport()) {
+           showToast('Web-Push-Benachrichtigungen werden von diesem Browser/Gerät nicht unterstützt.', 'error');
+           return;
+        }
+
+        const deviceName = settingsPushDeviceName ? settingsPushDeviceName.value.trim() : '';
+        if (!deviceName) {
+           showToast('Bitte gib einen Namen für dieses Gerät ein.', 'error');
+           return;
+        }
+
+        try {
+           btnPwaPushSubscribe.disabled = true;
+           const oldText = btnPwaPushSubscribe.innerHTML;
+           btnPwaPushSubscribe.innerHTML = '<span class="material-icons btn-icon spinning-icon">sync</span> Aktivieren...';
+
+           // Request Notification permission first if not granted
+           let permission = Notification.permission;
+           if (permission === 'default') {
+              permission = await Notification.requestPermission();
+           }
+
+           if (permission !== 'granted') {
+              showToast('Mitteilungs-Berechtigung wurde verweigert.', 'error');
+              btnPwaPushSubscribe.disabled = false;
+              btnPwaPushSubscribe.innerHTML = oldText;
+              return;
+           }
+
+           // Get VAPID public key
+           const vapidRes = await fetch('/api/auth/push-vapid-public');
+           if (!vapidRes.ok) {
+              const errData = await vapidRes.json();
+              throw new Error(errData.error || 'VAPID-Schlüssel konnte nicht abgerufen werden.');
+           }
+           const { publicKey } = await vapidRes.json();
+           const applicationServerKey = urlBase64ToUint8Array(publicKey);
+
+           // Register or get subscription
+           const reg = await navigator.serviceWorker.ready;
+           const subscription = await reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey
+           });
+
+           // Send subscription to backend
+           const platform = detectPlatform();
+           const subRes = await fetch('/api/auth/push-subscribe', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                 subscription,
+                 deviceName,
+                 platform
+              })
+           });
+
+           if (subRes.ok) {
+              showToast('Web-Push erfolgreich für dieses Gerät aktiviert!', 'success');
+              if (settingsPushDeviceName) settingsPushDeviceName.value = '';
+              loadPushStatus();
+              loadPushSubscriptions();
+           } else {
+              const errData = await subRes.json();
+              // Clean up local subscription if backend registration failed
+              await subscription.unsubscribe();
+              throw new Error(errData.error || 'Registrierung auf dem Server fehlgeschlagen.');
+           }
+
+        } catch (err) {
+           console.error('Error activating Web-Push:', err);
+           showToast(err.message || 'Fehler beim Aktivieren von Web-Push.', 'error');
+        } finally {
+           btnPwaPushSubscribe.disabled = false;
+           btnPwaPushSubscribe.innerHTML = `<span class="material-icons" style="font-size:1.1rem;">notifications_active</span> Aktivieren`;
+        }
+     }
+
+     async function handlePushUnsubscribe() {
+        if (!checkPwaPushSupport()) return;
+
+        try {
+           btnPwaPushUnsubscribe.disabled = true;
+           const oldText = btnPwaPushUnsubscribe.innerHTML;
+           btnPwaPushUnsubscribe.innerHTML = '<span class="material-icons btn-icon spinning-icon">sync</span> Deaktivieren...';
+
+           const reg = await navigator.serviceWorker.ready;
+           const subscription = await reg.pushManager.getSubscription();
+
+           if (subscription) {
+              // Call backend unsubscribe
+              const res = await fetch('/api/auth/push-unsubscribe', {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({ endpoint: subscription.endpoint })
+              });
+
+              if (res.ok) {
+                 // Unsubscribe locally
+                 await subscription.unsubscribe();
+                 showToast('Web-Push für dieses Gerät erfolgreich deaktiviert.', 'success');
+              } else {
+                 const errData = await res.json();
+                 showToast(errData.error || 'Fehler beim Deaktivieren auf dem Server.', 'error');
+              }
+           } else {
+              showToast('Kein aktives Abonnement auf diesem Gerät gefunden.', 'error');
+           }
+
+           loadPushStatus();
+           loadPushSubscriptions();
+
+        } catch (err) {
+           console.error('Error deactivating Web-Push:', err);
+           showToast('Fehler beim Deaktivieren von Web-Push.', 'error');
+        } finally {
+           btnPwaPushUnsubscribe.disabled = false;
+           btnPwaPushUnsubscribe.innerHTML = `<span class="material-icons" style="font-size:1.1rem;">notifications_off</span> Deaktivieren`;
+        }
+     }
+
+     async function handlePushTest() {
+        try {
+           btnPwaPushTest.disabled = true;
+           const oldText = btnPwaPushTest.innerHTML;
+           btnPwaPushTest.innerHTML = '<span class="material-icons btn-icon spinning-icon">sync</span> Testen...';
+
+           const res = await fetch('/api/auth/push-test', { method: 'POST' });
+           const data = await res.json();
+
+           if (res.ok && data.success) {
+              showToast('Test-Push-Mitteilung wurde an alle aktiven Abonnements gesendet!', 'success');
+              loadPushSubscriptions();
+           } else {
+              showToast(data.error || 'Fehler beim Senden der Test-Push-Mitteilung.', 'error');
+           }
+        } catch (err) {
+           console.error('Error sending test push:', err);
+           showToast('Netzwerk- oder Serverfehler beim Test-Push.', 'error');
+        } finally {
+           btnPwaPushTest.disabled = false;
+           btnPwaPushTest.innerHTML = `<span class="material-icons" style="font-size:1.1rem;">send</span> Testen`;
+        }
+     }
+
    // --- ACTUAL BUDGET CONNECTION HANDLERS ---
    let lastSavedAbUrl = '';
    let lastSavedAbSync = '';
@@ -1566,6 +1902,8 @@ document.addEventListener('DOMContentLoaded', () => {
          loadAbConfig();
          loadActualAccounts();
          loadDevices();
+         loadPushStatus();
+         loadPushSubscriptions();
       }
 
       // --- WIRE EVENT LISTENERS ---
@@ -1600,6 +1938,27 @@ document.addEventListener('DOMContentLoaded', () => {
          btnAuthLogout.addEventListener('click', (e) => {
             e.preventDefault();
             handleLogout();
+         });
+      }
+
+      if (btnPwaPushSubscribe) {
+         btnPwaPushSubscribe.addEventListener('click', (e) => {
+            e.preventDefault();
+            handlePushSubscribe();
+          });
+      }
+
+      if (btnPwaPushUnsubscribe) {
+         btnPwaPushUnsubscribe.addEventListener('click', (e) => {
+            e.preventDefault();
+            handlePushUnsubscribe();
+         });
+      }
+
+      if (btnPwaPushTest) {
+         btnPwaPushTest.addEventListener('click', (e) => {
+            e.preventDefault();
+            handlePushTest();
          });
       }
 

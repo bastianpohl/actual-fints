@@ -67,6 +67,44 @@ const {
    verifyAuthenticationResponse,
 } = require('@simplewebauthn/server');
 const crypto = require('node:crypto');
+const webpush = require('web-push');
+
+let vapidKeys = null;
+function getVapidKeys() {
+   if (vapidKeys) return vapidKeys;
+   
+   const masterKey = process.env.MASTER_KEY;
+   if (!masterKey) {
+      console.warn('WARNUNG: MASTER_KEY ist nicht konfiguriert. Kann VAPID-Schlüssel nicht laden.');
+      return null;
+   }
+   
+   let store;
+   try {
+      store = new CredentialsStore(masterKey);
+      let keysJson = store.getEncryptedConfig('auth_vapid_keys');
+      if (!keysJson) {
+         console.log('Generiere neue persistenten VAPID-Schlüssel...');
+         const newKeys = webpush.generateVAPIDKeys();
+         keysJson = JSON.stringify(newKeys);
+         store.setEncryptedConfig('auth_vapid_keys', keysJson);
+      }
+      vapidKeys = JSON.parse(keysJson);
+      
+      webpush.setVapidDetails(
+         'mailto:admin@actual-fints.local',
+         vapidKeys.publicKey,
+         vapidKeys.privateKey
+      );
+      
+      return vapidKeys;
+   } catch (err) {
+      console.error('Fehler beim Initialisieren der VAPID-Schlüssel:', err);
+      return null;
+   } finally {
+      if (store) store.close();
+   }
+}
 
 const JWT_SECRET = crypto.randomBytes(32);
 const SESSION_COOKIE_NAME = 'actual_fints_session';
@@ -577,6 +615,163 @@ app.delete('/api/auth/devices/:id', (req, res) => {
       } else {
          res.status(404).json({ error: 'Keine Geräte gefunden.' });
       }
+   } catch (err) {
+      res.status(500).json({ error: 'Datenbankfehler: ' + err.message });
+   } finally {
+      if (store) store.close();
+   }
+});
+
+// --- PWA Web-Push Endpoints ---
+
+app.get('/api/auth/push-vapid-public', (req, res) => {
+   const keys = getVapidKeys();
+   if (!keys) {
+      return res.status(500).json({ error: 'VAPID-Schlüssel konnten nicht geladen werden.' });
+   }
+   res.json({ publicKey: keys.publicKey });
+});
+
+app.post('/api/auth/push-subscribe', (req, res) => {
+   const { subscription, deviceName, platform } = req.body;
+   if (!subscription || !subscription.endpoint) {
+      return res.status(400).json({ error: 'Ungültiges Abonnement-Objekt.' });
+   }
+   
+   const masterKey = process.env.MASTER_KEY;
+   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht konfiguriert.' });
+   
+   let store;
+   try {
+      store = new CredentialsStore(masterKey);
+      const subsJson = store.getEncryptedConfig('auth_push_subscriptions');
+      let subscriptions = subsJson ? JSON.parse(subsJson) : [];
+      
+      // Remove existing subscription with same endpoint if exists
+      subscriptions = subscriptions.filter(s => s.subscription.endpoint !== subscription.endpoint);
+      
+      subscriptions.push({
+         subscription,
+         deviceName: deviceName || 'Unbekanntes Gerät',
+         platform: platform || 'Browser',
+         createdAt: new Date().toISOString()
+      });
+      
+      store.setEncryptedConfig('auth_push_subscriptions', JSON.stringify(subscriptions));
+      res.json({ success: true });
+   } catch (err) {
+      res.status(500).json({ error: 'Datenbankfehler: ' + err.message });
+   } finally {
+      if (store) store.close();
+   }
+});
+
+app.post('/api/auth/push-unsubscribe', (req, res) => {
+   const { endpoint } = req.body;
+   if (!endpoint) {
+      return res.status(400).json({ error: 'Endpunkt fehlt.' });
+   }
+   
+   const masterKey = process.env.MASTER_KEY;
+   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht konfiguriert.' });
+   
+   let store;
+   try {
+      store = new CredentialsStore(masterKey);
+      const subsJson = store.getEncryptedConfig('auth_push_subscriptions');
+      if (subsJson) {
+         let subscriptions = JSON.parse(subsJson);
+         subscriptions = subscriptions.filter(s => s.subscription.endpoint !== endpoint);
+         
+         if (subscriptions.length > 0) {
+            store.setEncryptedConfig('auth_push_subscriptions', JSON.stringify(subscriptions));
+         } else {
+            store.deleteConfig('auth_push_subscriptions');
+         }
+      }
+      res.json({ success: true });
+   } catch (err) {
+      res.status(500).json({ error: 'Datenbankfehler: ' + err.message });
+   } finally {
+      if (store) store.close();
+   }
+});
+
+app.get('/api/auth/push-subscriptions', (req, res) => {
+   const masterKey = process.env.MASTER_KEY;
+   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht konfiguriert.' });
+   
+   let store;
+   try {
+      store = new CredentialsStore(masterKey);
+      const subsJson = store.getEncryptedConfig('auth_push_subscriptions');
+      const subscriptions = subsJson ? JSON.parse(subsJson) : [];
+      res.json(subscriptions.map(s => ({
+         deviceName: s.deviceName,
+         platform: s.platform,
+         createdAt: s.createdAt,
+         endpoint: s.subscription.endpoint
+      })));
+   } catch (err) {
+      res.status(500).json({ error: 'Datenbankfehler: ' + err.message });
+   } finally {
+      if (store) store.close();
+   }
+});
+
+app.post('/api/auth/push-test', async (req, res) => {
+   const masterKey = process.env.MASTER_KEY;
+   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht konfiguriert.' });
+   
+   const keys = getVapidKeys();
+   if (!keys) {
+      return res.status(500).json({ error: 'VAPID-Schlüssel konnten nicht geladen werden.' });
+   }
+   
+   let store;
+   try {
+      store = new CredentialsStore(masterKey);
+      const subsJson = store.getEncryptedConfig('auth_push_subscriptions');
+      const subscriptions = subsJson ? JSON.parse(subsJson) : [];
+      
+      if (subscriptions.length === 0) {
+         return res.status(400).json({ error: 'Keine Geräte für Web-Push abonniert.' });
+      }
+      
+      const payload = JSON.stringify({
+         title: 'PWA Web-Push 🔔',
+         body: 'Herzlichen Glückwunsch! Deine PWA Web-Push-Verbindung funktioniert einwandfrei!'
+      });
+      
+      const results = [];
+      let dbChanged = false;
+      let activeSubscriptions = [...subscriptions];
+      
+      for (const sub of subscriptions) {
+         try {
+            await webpush.sendNotification(sub.subscription, payload);
+            results.push({ deviceName: sub.deviceName, status: 'Erfolgreich' });
+         } catch (err) {
+            console.error(`Fehler beim Senden an ${sub.deviceName}:`, err);
+            if (err.statusCode === 410 || err.statusCode === 404) {
+               activeSubscriptions = activeSubscriptions.filter(s => s.subscription.endpoint !== sub.subscription.endpoint);
+               dbChanged = true;
+               results.push({ deviceName: sub.deviceName, status: 'Entfernt (Inaktiv)' });
+            } else {
+               results.push({ deviceName: sub.deviceName, status: 'Fehler: ' + err.message });
+            }
+         }
+      }
+      
+      if (dbChanged) {
+         if (activeSubscriptions.length > 0) {
+            store.setEncryptedConfig('auth_push_subscriptions', JSON.stringify(activeSubscriptions));
+         } else {
+            store.deleteConfig('auth_push_subscriptions');
+         }
+      }
+      
+      res.json({ success: true, results });
    } catch (err) {
       res.status(500).json({ error: 'Datenbankfehler: ' + err.message });
    } finally {

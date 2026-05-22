@@ -1,5 +1,71 @@
 const ntfyTopic = process.env.NTFY_TOPIC;
 const ntfyServer = process.env.NTFY_SERVER || 'https://ntfy.sh';
+const webpush = require('web-push');
+const { CredentialsStore } = require('../lib/credentials-store');
+
+/**
+ * Sends a standard Web-Push notification to all registered PWA standalone devices.
+ * @param {string} title
+ * @param {string} message
+ */
+async function sendWebPush(title, message) {
+   const masterKey = process.env.MASTER_KEY;
+   if (!masterKey) {
+      console.warn('Web-Push übersprungen: MASTER_KEY ist nicht konfiguriert.');
+      return;
+   }
+   
+   let store;
+   try {
+      store = new CredentialsStore(masterKey);
+      
+      const keysJson = store.getEncryptedConfig('auth_vapid_keys');
+      if (!keysJson) {
+         console.warn('Web-Push übersprungen: Keine VAPID-Schlüssel konfiguriert.');
+         return;
+      }
+      
+      const vapidKeys = JSON.parse(keysJson);
+      webpush.setVapidDetails(
+         'mailto:admin@actual-fints.local',
+         vapidKeys.publicKey,
+         vapidKeys.privateKey
+      );
+      
+      const subsJson = store.getEncryptedConfig('auth_push_subscriptions');
+      if (!subsJson) return; // No PWA push subscribers
+      
+      const subscriptions = JSON.parse(subsJson);
+      let activeSubscriptions = [...subscriptions];
+      let dbChanged = false;
+      
+      const payload = JSON.stringify({ title, body: message });
+      
+      for (const sub of subscriptions) {
+         try {
+            await webpush.sendNotification(sub.subscription, payload);
+         } catch (err) {
+            console.error(`Fehler beim Senden der Web-Push an ${sub.deviceName}:`, err);
+            if (err.statusCode === 410 || err.statusCode === 404) {
+               activeSubscriptions = activeSubscriptions.filter(s => s.subscription.endpoint !== sub.subscription.endpoint);
+               dbChanged = true;
+            }
+         }
+      }
+      
+      if (dbChanged) {
+         if (activeSubscriptions.length > 0) {
+            store.setEncryptedConfig('auth_push_subscriptions', JSON.stringify(activeSubscriptions));
+         } else {
+            store.deleteConfig('auth_push_subscriptions');
+         }
+      }
+   } catch (err) {
+      console.error('Fehler bei der Web-Push Übertragung:', err.message);
+   } finally {
+      if (store) store.close();
+   }
+}
 
 /**
  * Formats a transaction amount stored in cents back to EUR string.
@@ -126,10 +192,18 @@ async function sendSuccessNotification(results, overrideTopic = null, overrideSe
       message = 'Alle Konten sind auf dem neuesten Stand. Keine neuen Umsätze gefunden.';
    }
 
+   // 1. Send via standard ntfy
    try {
       await sendNtfy(title, message, tags, priority, overrideTopic, overrideServer);
    } catch (error) {
-      console.error('Fehler bei der Push-Benachrichtigungs-Übertragung:', error.message);
+      console.error('Fehler bei der ntfy Push-Benachrichtigungs-Übertragung:', error.message);
+   }
+
+   // 2. Send via native Web-Push (PWA)
+   try {
+      await sendWebPush(title, message);
+   } catch (error) {
+      console.error('Fehler bei der PWA Web-Push-Übertragung:', error.message);
    }
 }
 
@@ -149,10 +223,18 @@ async function sendFailureNotification(error, overrideTopic = null, overrideServ
 Fehlermeldung:
 ${error?.message || error || 'Unbekannter Fehler'}`;
 
+   // 1. Send via standard ntfy
    try {
       await sendNtfy(title, message, tags, priority, overrideTopic, overrideServer);
    } catch (error) {
-      console.error('Fehler bei der Push-Benachrichtigungs-Übertragung:', error.message);
+      console.error('Fehler bei der ntfy Push-Benachrichtigungs-Übertragung:', error.message);
+   }
+
+   // 2. Send via native Web-Push (PWA)
+   try {
+      await sendWebPush(title, message);
+   } catch (error) {
+      console.error('Fehler bei der PWA Web-Push-Übertragung:', error.message);
    }
 }
 
@@ -161,3 +243,4 @@ module.exports = {
    sendFailureNotification,
    sendNtfy
 };
+

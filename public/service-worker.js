@@ -56,3 +56,57 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// --- PWA WEB-PUSH NOTIFICATIONS ---
+
+self.addEventListener('push', (event) => {
+  let payload = {
+    title: 'Actual-FinTS 🏦',
+    body: 'Neue Bank-Synchronisation durchgeführt!'
+  };
+
+  if (event.data) {
+    try {
+      payload = event.data.json();
+    } catch (e) {
+      // Fallback to plain text if not JSON
+      payload.body = event.data.text();
+    }
+  }
+
+  const options = {
+    body: payload.body,
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    vibrate: [100, 50, 100],
+    data: {
+      url: '/'
+    }
+  };
+
+  event.waitUntil(
+     self.registration.showNotification(payload.title, options)
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const targetUrl = event.notification.data ? event.notification.data.url : '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // If a window is already open, focus it
+      for (const client of clientList) {
+        const clientPath = new URL(client.url).pathname;
+        if (clientPath === targetUrl && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Otherwise open a new window
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});

@@ -482,10 +482,59 @@
                               <span class="material-icons btn-icon">save</span> Speichern
                            </button>
                         </div>
+                  </div>
+               </div>
+            </div>
+
+            <!-- PWA Web-Push Box -->
+            <div class="glass-card">
+               <h2 style="font-size:1.2rem; font-weight:600; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem; justify-content:space-between;">
+                  <div style="display:flex; align-items:center; gap:0.5rem;">
+                     <span class="material-icons" style="color: var(--accent-primary);">ad_units</span> PWA Web-Push
+                  </div>
+                  <span id="settings-push-status" class="account-actual-name" style="color:var(--text-muted); font-weight:500; font-size:0.75rem; background:rgba(255, 255, 255, 0.05); padding: 0.25rem 0.5rem; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.08);">Inaktiv</span>
+               </h2>
+               
+               <p style="color: var(--text-secondary); font-size:0.8rem; margin-bottom:1rem; line-height:1.4;">
+                  Erhalte native Mitteilungen direkt über diese installierte PWA-App auf deinem Home-Bildschirm.
+               </p>
+               
+               <!-- iOS Warning Note (hidden if PWA, shown otherwise or just standard helpful tip) -->
+               <div id="pwa-push-ios-note" style="font-size:0.75rem; line-height:1.4; color: var(--warning); background: rgba(245, 158, 11, 0.08); padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.15); margin-bottom: 1rem; display: none;">
+                  <strong>iOS-Hinweis:</strong> Um Web-Push zu nutzen, musst du diese App über Safari als Homescreen-App ("Zum Home-Bildschirm hinzufügen") installieren.
+               </div>
+               
+               <div style="display:flex; flex-direction:column; gap:0.75rem; font-size:0.9rem;">
+                  <!-- Device subscription list -->
+                  <div class="form-group" style="margin-bottom:0.25rem;">
+                     <span style="font-size:0.75rem; color: var(--text-secondary); display:block; margin-bottom:0.5rem;">Abonnierte Push-Geräte</span>
+                     <div id="pwa-push-devices-container" style="display:flex; flex-direction:column; gap:0.5rem;">
+                        <div style="font-size:0.8rem; color:var(--text-muted); font-style:italic; text-align:center; padding: 0.5rem 0; border: 1px dashed var(--display-border); border-radius: 8px;">
+                           Keine Geräte abonniert
+                        </div>
+                     </div>
+                  </div>
+
+                  <!-- Sub/Unsub actions for this device -->
+                  <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:0.25rem;">
+                     <div id="pwa-push-unregistered-actions" style="display:flex; gap:0.5rem; align-items:center; width: 100%;">
+                        <input type="text" id="settings-push-device-name" class="input-field" placeholder="Gerätename (z.B. Mein iPhone)" style="font-size:0.85rem; padding:0.4rem 0.6rem; height:36px; flex:1;">
+                        <button class="btn" id="btn-pwa-push-subscribe" style="height:36px; font-size:0.85rem; padding:0 0.75rem; display:flex; align-items:center; gap:0.25rem; width:auto; flex-shrink:0;">
+                           <span class="material-icons" style="font-size:1.1rem;">notifications_active</span> Aktivieren
+                        </button>
+                     </div>
+                     <div id="pwa-push-registered-actions" style="display:none; gap:0.5rem; width:100%;">
+                        <button class="btn secondary warning-border" id="btn-pwa-push-unsubscribe" style="height:36px; font-size:0.85rem; flex:1; border-color: var(--warning); color: var(--warning); background: transparent; display:flex; align-items:center; justify-content:center; gap:0.25rem;">
+                           <span class="material-icons" style="font-size:1.1rem;">notifications_off</span> Deaktivieren
+                        </button>
+                        <button class="btn secondary" id="btn-pwa-push-test" style="height:36px; font-size:0.85rem; flex:1; display:flex; align-items:center; justify-content:center; gap:0.25rem;">
+                           <span class="material-icons" style="font-size:1.1rem;">send</span> Testen
+                        </button>
                      </div>
                   </div>
                </div>
             </div>
+
          </div>
       </main>
 
