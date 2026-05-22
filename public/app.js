@@ -503,7 +503,8 @@ document.addEventListener('DOMContentLoaded', () => {
       inputName.disabled = true; // Cannot edit core primary key bank name easily in SQLite store here
       inputUrl.value = bank.fints.url;
       inputBlz.value = bank.fints.blz;
-      inputLogin.value = bank.fints.login;
+      // Leave Login blank unless user wants to change it
+      inputLogin.value = '';
       inputLogin.placeholder = '●●●●●●●● (Unverändert lassen)';
       inputLogin.required = false;
       
@@ -560,7 +561,7 @@ document.addEventListener('DOMContentLoaded', () => {
          name: inputName.value.trim(),
          url: inputUrl.value.trim(),
          blz: inputBlz.value.trim(),
-         login: inputLogin.value.trim(),
+         login: inputLogin.value.trim() || '●●●●●●●●', // If blank in edit mode, keeps original
          pin: inputPin.value || '●●●●●●●●', // If blank in edit mode, keeps original
          accounts
       };
