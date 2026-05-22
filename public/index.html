@@ -5,13 +5,16 @@
    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
    <title>Actual-FinTS Connector Dashboard</title>
    <link rel="stylesheet" href="style.css">
+   <!-- Google Material Icons -->
+   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
    <script>
       (function() {
+         const themeAuto = localStorage.getItem('theme_auto') !== 'false';
          const savedTheme = localStorage.getItem('theme');
          const systemPrefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
-         if (savedTheme === 'light' || (!savedTheme && systemPrefersLight)) {
+         if (themeAuto ? systemPrefersLight : savedTheme === 'light') {
             document.body.classList.add('light-theme');
          }
       })();
@@ -21,24 +24,24 @@
       <!-- Brand Header -->
       <header>
          <div class="brand-section">
-            <h1>🏦 Actual‑FinTS Connector</h1>
+            <h1><span class="material-icons" style="font-size: 2.2rem; vertical-align: middle; margin-right: 0.5rem; background: var(--brand-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">account_balance</span> Actual‑FinTS Connector</h1>
             <p>Deutscher Banken-Sync für Actual Budget</p>
          </div>
          <div class="header-controls">
             <nav class="nav-tabs">
                <button class="nav-tab active" data-tab="dashboard">
-                  <span>📊</span> Dashboard
+                  <span class="material-icons">dashboard</span> Dashboard
                </button>
                <button class="nav-tab" data-tab="banks" id="banks-tab-btn">
-                  <span>🏦</span> Banken
+                  <span class="material-icons">account_balance</span> Banken
                </button>
                <button class="nav-tab" data-tab="logs" id="logs-tab-btn">
-                  <span>📟</span> System-Logs
+                  <span class="material-icons">terminal</span> System-Logs
+               </button>
+               <button class="nav-tab" data-tab="settings" id="settings-tab-btn">
+                  <span class="material-icons">settings</span> Einstellungen
                </button>
             </nav>
-            <button class="btn secondary" id="theme-toggle-btn" title="Design umschalten">
-               <span>☀️</span>
-            </button>
          </div>
       </header>
 
@@ -47,21 +50,21 @@
          <!-- Status Summary Cards -->
          <div class="status-grid">
             <div class="glass-card status-badge">
-               <div class="status-icon success" id="status-actual-icon">✓</div>
+               <span class="material-icons status-icon-md success" id="status-actual-icon">check_circle</span>
                <div class="status-details">
                   <h3>Actual Budget</h3>
                   <p id="status-actual-text">Verbinde...</p>
                </div>
             </div>
             <div class="glass-card status-badge">
-               <div class="status-icon success" id="status-db-icon">✓</div>
+               <span class="material-icons status-icon-md success" id="status-db-icon">account_balance</span>
                <div class="status-details">
                   <h3>Banken & Konten</h3>
                   <p id="status-db-text">0 Banken (0 Konten)</p>
                </div>
             </div>
             <div class="glass-card status-badge">
-               <div class="status-icon success" id="status-sync-icon">⏰</div>
+               <span class="material-icons status-icon-md success" id="status-sync-icon">schedule</span>
                <div class="status-details">
                   <h3>Letzter Sync</h3>
                   <p id="status-sync-text">Nie</p>
@@ -69,13 +72,13 @@
             </div>
          </div>
 
-         <!-- Sync Operations Grid -->
-         <div class="dashboard-grid">
+         <!-- Sync Operations Grid (Full width for Sync Box) -->
+         <div class="dashboard-grid" style="grid-template-columns: 1fr;">
             <!-- Sync Action Box -->
             <div class="glass-card sync-section">
                <div class="sync-header">
                   <h2>Transaktionen abrufen & importieren</h2>
-                  <span class="status-icon warning" style="width:32px; height:32px; font-size:1rem;" id="sync-running-spinner">⏳</span>
+                  <span class="material-icons spinning-icon warning" style="font-size:1.5rem; color:var(--warning);" id="sync-running-spinner">sync</span>
                </div>
                
                <p style="color: var(--text-secondary); font-size:0.9rem;">
@@ -96,103 +99,8 @@
                <div class="sync-action-row" style="margin-top:0.5rem;">
                   <span style="font-size:0.85rem; color:var(--text-secondary);" id="sync-info-msg">Wähle Zeitspanne oder lasse Felder leer für "Heute".</span>
                   <button class="btn" id="start-sync-btn">
-                     <span>⚡</span> Sync starten
+                     <span class="material-icons btn-icon">bolt</span> Sync starten
                   </button>
-               </div>
-            </div>
-
-            <!-- Right Column stacked cards -->
-            <div style="display:flex; flex-direction:column; gap:1.5rem;">
-               <!-- Health Config Box -->
-               <div class="glass-card" style="display:flex; flex-direction:column; justify-content:space-between; height: 100%;">
-                  <div>
-                     <h2 style="font-size:1.2rem; font-weight:600; margin-bottom:1rem;">Systemkonfiguration</h2>
-                     <div style="display:flex; flex-direction:column; gap:0.75rem; font-size:0.9rem;">
-                        <div style="display:flex; justify-content:space-between;">
-                           <span style="color: var(--text-secondary);">MASTER_KEY:</span>
-                           <span id="config-master-key" class="account-actual-name" style="color:var(--success);">Gefunden</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between;">
-                           <span style="color: var(--text-secondary);">Actual Server URL:</span>
-                           <span id="config-ab-url" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">-</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between;">
-                           <span style="color: var(--text-secondary);">Budget Sync ID:</span>
-                           <span id="config-ab-sync" style="font-family: var(--font-mono); font-size:0.8rem;">-</span>
-                        </div>
-                     </div>
-                  </div>
-                  
-                  <button class="btn secondary" id="git-update-btn" style="margin-top:1.5rem;">
-                     <span>🔄</span> Git Pull & API Update
-                  </button>
-               </div>
-
-               <!-- Push-Benachrichtigungen Box -->
-               <div class="glass-card" style="display:flex; flex-direction:column; justify-content:space-between; height: 100%;">
-                  <div>
-                     <h2 style="font-size:1.2rem; font-weight:600; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
-                        <span>🔔</span> Push-Notifications
-                     </h2>
-                     <p style="color: var(--text-secondary); font-size:0.8rem; margin-bottom:1rem; line-height:1.4;">
-                        Erhalte kostenlose Push-Mitteilungen bei neuen Umsätzen direkt auf dein Smartphone via <strong>ntfy.sh</strong>.
-                     </p>
-
-                     <!-- 1. READ-ONLY VIEW (Default) -->
-                     <div id="ntfy-read-view" style="display:flex; flex-direction:column; gap:0.75rem; font-size:0.9rem;">
-                        <div class="form-group" style="margin-bottom:0.25rem;">
-                           <span style="font-size:0.75rem; color: var(--text-secondary);">Geheimes Topic (ntfy.sh)</span>
-                           <div style="display:flex; align-items:center; justify-content:space-between; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); padding: 0.4rem 0.6rem; border-radius: 8px; margin-top: 0.25rem; min-height:36px;">
-                              <span id="ntfy-topic-display" style="font-family: var(--font-mono); font-size:0.85rem; word-break:break-all; color: var(--text-primary);">-</span>
-                              <button class="btn secondary" id="btn-copy-topic" style="padding:0; width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-size:0.8rem; margin-left: 0.5rem;" title="Kopieren">📋</button>
-                           </div>
-                        </div>
-                        <div class="form-group" style="margin-bottom:0.25rem;">
-                           <span style="font-size:0.75rem; color: var(--text-secondary);">Server</span>
-                           <div style="display:flex; align-items:center; justify-content:space-between; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); padding: 0.4rem 0.6rem; border-radius: 8px; margin-top: 0.25rem; min-height:36px;">
-                              <span id="ntfy-server-display" style="font-family: var(--font-mono); font-size:0.85rem; word-break:break-all; color: var(--text-primary);">https://ntfy.sh</span>
-                              <button class="btn secondary" id="btn-copy-server" style="padding:0; width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-size:0.8rem; margin-left: 0.5rem;" title="Kopieren">📋</button>
-                           </div>
-                        </div>
-                        <div style="font-size:0.75rem; line-height:1.4; color: var(--text-muted);" id="ntfy-setup-guide-read">
-                           Abonniere das Topic in der iOS-App, um Push-Mitteilungen zu aktivieren.
-                        </div>
-                        <div style="display:flex; gap:0.5rem; margin-top:1.25rem; width:100%;">
-                            <button class="btn secondary" id="btn-switch-to-edit" style="flex:1;">
-                               <span>✏️</span> Editieren
-                            </button>
-                            <button class="btn secondary" id="btn-test-push" style="flex:1;">
-                               <span>🔔</span> Testen
-                            </button>
-                         </div>
-                     </div>
-
-                     <!-- 2. EDIT VIEW (Hidden by default) -->
-                     <div id="ntfy-edit-view" style="display:none; flex-direction:column; gap:0.75rem; font-size:0.9rem;">
-                        <div class="form-group" style="margin-bottom:0.25rem;">
-                           <label for="ntfy-topic-input" style="font-size:0.75rem; color: var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
-                              Geheimes Topic (ntfy.sh)
-                              <button id="btn-show-topic" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.75rem; padding:0; outline:none;">Anzeigen</button>
-                           </label>
-                           <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
-                              <input type="password" id="ntfy-topic-input" class="input-field" style="font-family: var(--font-mono); font-size:0.85rem; padding:0.4rem 0.6rem; height:36px;" placeholder="Kein Topic konfiguriert">
-                              <button class="btn secondary" id="btn-generate-topic" style="padding:0; width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-size:1rem;" title="Zufälliges Topic generieren">🎲</button>
-                           </div>
-                        </div>
-                        <div class="form-group" style="margin-bottom:0.25rem;">
-                           <label for="ntfy-server-input" style="font-size:0.75rem; color: var(--text-secondary);">
-                              Alternativer ntfy-Server (Optional)
-                           </label>
-                           <input type="url" id="ntfy-server-input" class="input-field" style="font-size:0.85rem; padding:0.4rem 0.6rem; height:36px; margin-top:0.25rem;" placeholder="https://ntfy.sh">
-                        </div>
-                        <div style="display:flex; gap:0.5rem; margin-top:1.25rem;">
-                           <button class="btn secondary" id="btn-cancel-edit" style="flex:1;">Abbrechen</button>
-                           <button class="btn" id="save-ntfy-btn" style="flex:1;">
-                              <span>💾</span> Speichern
-                           </button>
-                        </div>
-                     </div>
-                  </div>
                </div>
             </div>
          </div>
@@ -201,7 +109,7 @@
          <div class="glass-card" id="sync-results-card" style="margin-top: 1.5rem; display: none;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem; border-bottom:1px solid rgba(255, 255, 255, 0.05); padding-bottom:0.75rem;">
                <h2 style="font-size:1.25rem; font-weight:600; display:flex; align-items:center; gap:0.5rem;">
-                  <span>📋</span> Importierte Umsätze
+                  <span class="material-icons">list_alt</span> Importierte Umsätze
                </h2>
                <button class="btn secondary" id="close-sync-results-btn" style="padding:0.35rem 0.75rem; font-size:0.8rem;">Ausblenden</button>
             </div>
@@ -229,7 +137,7 @@
          <div class="bank-list-header">
             <h2>Konfigurierte Banken</h2>
             <button class="btn" id="add-bank-btn">
-               <span>➕</span> Bank hinzufügen
+               <span class="material-icons btn-icon">add</span> Bank hinzufügen
             </button>
          </div>
 
@@ -263,12 +171,164 @@
          </div>
       </main>
 
+      <!-- Page 4: Dedicated Settings Page -->
+      <main id="settings-tab" class="tab-content">
+         <div class="bank-list-header">
+            <h2>System- & Schemakonfiguration</h2>
+         </div>
+
+         <div class="settings-grid">
+            <!-- Left Column: Theme & System configurations -->
+            <div style="display:flex; flex-direction:column; gap:1.5rem;">
+               
+               <!-- Design / Theme Settings Card -->
+               <div class="glass-card">
+                  <h2 style="font-size:1.2rem; font-weight:600; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
+                     <span class="material-icons" style="color: var(--accent-primary);">palette</span> Design-Einstellungen
+                  </h2>
+                  <div style="display:flex; flex-direction:column; gap:1.25rem;">
+                     <div class="form-group" style="display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:1rem;">
+                        <label for="settings-system-theme" style="margin-bottom:0; cursor:pointer; flex:1;">
+                           <span style="font-weight: 500; display:block; color: var(--text-primary);">Systemeinstellung nutzen</span>
+                           <span style="font-size:0.75rem; color:var(--text-secondary); display:block; margin-top:0.25rem; line-height:1.3;">
+                              Passt das Design automatisch an die Einstellungen deines Browsers/Systems an.
+                           </span>
+                        </label>
+                        <div class="checkbox-wrapper">
+                           <input type="checkbox" id="settings-system-theme" class="checkbox-input">
+                           <label for="settings-system-theme" class="checkbox-label"></label>
+                        </div>
+                     </div>
+
+                     <div class="form-group" id="manual-theme-group" style="transition: opacity 0.3s; margin-top: 0.25rem;">
+                        <span style="font-size:0.75rem; color: var(--text-secondary); display:block; margin-bottom:0.5rem;">Bevorzugtes Design (Manuell)</span>
+                        <div style="display:flex; gap:0.75rem;">
+                           <button class="btn secondary theme-select-btn" id="theme-btn-dark" style="flex:1;">
+                              <span class="material-icons">dark_mode</span> Dunkel
+                           </button>
+                           <button class="btn secondary theme-select-btn" id="theme-btn-light" style="flex:1;">
+                              <span class="material-icons">light_mode</span> Hell
+                           </button>
+                        </div>
+                     </div>
+                  </div>
+               </div>
+
+               <!-- Systemkonfiguration Card -->
+               <div class="glass-card" style="display:flex; flex-direction:column; justify-content:space-between; height: auto;">
+                  <div>
+                     <h2 style="font-size:1.2rem; font-weight:600; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
+                        <span class="material-icons" style="color: var(--accent-primary);">dns</span> Systemkonfiguration
+                     </h2>
+                     <div style="display:flex; flex-direction:column; gap:0.75rem; font-size:0.9rem;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                           <span style="color: var(--text-secondary);">MASTER_KEY:</span>
+                           <span id="config-master-key" class="account-actual-name" style="color:var(--success); font-weight:500;">Gefunden</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                           <span style="color: var(--text-secondary);">Actual Server URL:</span>
+                           <span id="config-ab-url" style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size:0.8rem;">-</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                           <span style="color: var(--text-secondary);">Budget Sync ID:</span>
+                           <span id="config-ab-sync" style="font-family: var(--font-mono); font-size:0.8rem;">-</span>
+                        </div>
+                     </div>
+                  </div>
+                  
+                  <button class="btn secondary" id="git-update-btn" style="margin-top:1.5rem; width: 100%;">
+                     <span class="material-icons btn-icon">sync</span> Git Pull & API Update
+                  </button>
+               </div>
+
+            </div>
+
+            <!-- Right Column: Push settings -->
+            <div>
+               <!-- Push-Benachrichtigungen Box -->
+               <div class="glass-card" style="display:flex; flex-direction:column; justify-content:space-between; height: 100%;">
+                  <div>
+                     <h2 style="font-size:1.2rem; font-weight:600; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+                        <span class="material-icons" style="color: var(--accent-primary);">notifications</span> Push-Notifications
+                     </h2>
+                     <p style="color: var(--text-secondary); font-size:0.8rem; margin-bottom:1rem; line-height:1.4;">
+                        Erhalte kostenlose Push-Mitteilungen bei neuen Umsätzen direkt auf dein Smartphone via <strong>ntfy.sh</strong>.
+                     </p>
+
+                     <!-- 1. READ-ONLY VIEW (Default) -->
+                     <div id="ntfy-read-view" style="display:flex; flex-direction:column; gap:0.75rem; font-size:0.9rem;">
+                        <div class="form-group" style="margin-bottom:0.25rem;">
+                           <span style="font-size:0.75rem; color: var(--text-secondary);">Geheimes Topic (ntfy.sh)</span>
+                           <div style="display:flex; align-items:center; justify-content:space-between; background: var(--display-bg); border: 1px solid var(--display-border); padding: 0.4rem 0.6rem; border-radius: 8px; margin-top: 0.25rem; min-height:36px;">
+                              <span id="ntfy-topic-display" style="font-family: var(--font-mono); font-size:0.85rem; word-break:break-all; color: var(--text-primary);">-</span>
+                              <button class="btn secondary" id="btn-copy-topic" style="padding:0; width:28px; height:28px; display:flex; align-items:center; justify-content:center; margin-left: 0.5rem;" title="Kopieren">
+                                 <span class="material-icons" style="font-size:1.1rem;">content_copy</span>
+                              </button>
+                           </div>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0.25rem;">
+                           <span style="font-size:0.75rem; color: var(--text-secondary);">Server</span>
+                           <div style="display:flex; align-items:center; justify-content:space-between; background: var(--display-bg); border: 1px solid var(--display-border); padding: 0.4rem 0.6rem; border-radius: 8px; margin-top: 0.25rem; min-height:36px;">
+                              <span id="ntfy-server-display" style="font-family: var(--font-mono); font-size:0.85rem; word-break:break-all; color: var(--text-primary);">https://ntfy.sh</span>
+                              <button class="btn secondary" id="btn-copy-server" style="padding:0; width:28px; height:28px; display:flex; align-items:center; justify-content:center; margin-left: 0.5rem;" title="Kopieren">
+                                 <span class="material-icons" style="font-size:1.1rem;">content_copy</span>
+                              </button>
+                           </div>
+                        </div>
+                        <div style="font-size:0.75rem; line-height:1.4; color: var(--text-muted);" id="ntfy-setup-guide-read">
+                           Abonniere das Topic in der iOS-App, um Push-Mitteilungen zu aktivieren.
+                        </div>
+                        <div style="display:flex; gap:0.5rem; margin-top:1.25rem; width:100%;">
+                           <button class="btn secondary" id="btn-switch-to-edit" style="flex:1;">
+                              <span class="material-icons btn-icon">edit</span> Editieren
+                           </button>
+                           <button class="btn secondary" id="btn-test-push" style="flex:1;">
+                              <span class="material-icons btn-icon">notifications_active</span> Testen
+                           </button>
+                        </div>
+                     </div>
+
+                     <!-- 2. EDIT VIEW (Hidden by default) -->
+                     <div id="ntfy-edit-view" style="display:none; flex-direction:column; gap:0.75rem; font-size:0.9rem;">
+                        <div class="form-group" style="margin-bottom:0.25rem;">
+                           <label for="ntfy-topic-input" style="font-size:0.75rem; color: var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
+                              Geheimes Topic (ntfy.sh)
+                              <button id="btn-show-topic" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.75rem; padding:0; outline:none;">Anzeigen</button>
+                           </label>
+                           <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
+                              <input type="password" id="ntfy-topic-input" class="input-field" style="font-family: var(--font-mono); font-size:0.85rem; padding:0.4rem 0.6rem; height:36px;" placeholder="Kein Topic konfiguriert">
+                              <button class="btn secondary" id="btn-generate-topic" style="padding:0; width:36px; height:36px; display:flex; align-items:center; justify-content:center;" title="Zufälliges Topic generieren">
+                                 <span class="material-icons">casino</span>
+                              </button>
+                           </div>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0.25rem;">
+                           <label for="ntfy-server-input" style="font-size:0.75rem; color: var(--text-secondary);">
+                              Alternativer ntfy-Server (Optional)
+                           </label>
+                           <input type="url" id="ntfy-server-input" class="input-field" style="font-size:0.85rem; padding:0.4rem 0.6rem; height:36px; margin-top:0.25rem;" placeholder="https://ntfy.sh">
+                        </div>
+                        <div style="display:flex; gap:0.5rem; margin-top:1.25rem;">
+                           <button class="btn secondary" id="btn-cancel-edit" style="flex:1;">Abbrechen</button>
+                           <button class="btn" id="save-ntfy-btn" style="flex:1;">
+                              <span class="material-icons btn-icon">save</span> Speichern
+                           </button>
+                        </div>
+                     </div>
+                  </div>
+               </div>
+            </div>
+         </div>
+      </main>
+
       <!-- Modal: Add/Edit Bank -->
       <div class="modal-backdrop" id="bank-modal">
          <div class="glass-card modal-card">
             <div class="modal-header">
                <h2 id="modal-title">Neue Bank hinzufügen</h2>
-               <button class="close-btn" id="modal-close-btn">&times;</button>
+               <button class="close-btn" id="modal-close-btn">
+                  <span class="material-icons">close</span>
+               </button>
             </div>
             <form class="modal-form" id="bank-form" onsubmit="return false;">
                <input type="hidden" id="bank-modal-edit-mode" value="">
@@ -304,8 +364,8 @@
                <div class="modal-accounts-section">
                   <div class="modal-accounts-title">
                      <h3>Konto-Mappings (FinTS IBAN → Actual Budget Name)</h3>
-                     <button class="btn secondary" type="button" id="modal-add-account-row" style="padding:0.3rem 0.6rem; font-size:0.8rem;">
-                        ＋ Zeile
+                     <button class="btn secondary" type="button" id="modal-add-account-row" style="padding:0.3rem 0.6rem; font-size:0.8rem; display:flex; align-items:center;">
+                        <span class="material-icons" style="font-size:0.95rem; margin-right:0.2rem;">add</span> Zeile
                      </button>
                   </div>
                   <div id="modal-account-rows-container">

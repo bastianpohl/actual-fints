@@ -39,8 +39,11 @@ document.addEventListener('DOMContentLoaded', () => {
    const refreshLogsBtn = document.getElementById('refresh-logs-btn');
    const clearLogsUiBtn = document.getElementById('clear-logs-ui-btn');
 
-   // Theme
-   const themeToggleBtn = document.getElementById('theme-toggle-btn');
+   // Theme Settings selectors
+   const settingsSystemTheme = document.getElementById('settings-system-theme');
+   const themeBtnDark = document.getElementById('theme-btn-dark');
+   const themeBtnLight = document.getElementById('theme-btn-light');
+   const manualThemeGroup = document.getElementById('manual-theme-group');
 
    // Modal
    const bankModal = document.getElementById('bank-modal');
@@ -93,11 +96,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const toast = document.createElement('div');
       toast.className = `toast ${type}`;
       
-      let icon = 'ℹ️';
-      if (type === 'success') icon = '✅';
-      if (type === 'error') icon = '❌';
+      let icon = 'info';
+      if (type === 'success') icon = 'check_circle';
+      if (type === 'error') icon = 'error';
       
-      toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+      toast.innerHTML = `<span class="material-icons">${icon}</span> <span>${message}</span>`;
       container.appendChild(toast);
 
       setTimeout(() => {
@@ -130,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
             loadBanks();
          } else if (targetTab === 'logs') {
             loadLogs();
-         } else if (targetTab === 'dashboard') {
+         } else if (targetTab === 'dashboard' || targetTab === 'settings') {
             loadStatus();
          }
       });
@@ -146,23 +149,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
          // Update Actual Budget Badge
          if (data.actualBudgetConfigured) {
-            statusActualIcon.className = 'status-icon success';
-            statusActualIcon.textContent = '✓';
+            statusActualIcon.className = 'material-icons status-icon-md success';
+            statusActualIcon.textContent = 'check_circle';
             statusActualText.textContent = 'Bereit';
          } else {
-            statusActualIcon.className = 'status-icon danger';
-            statusActualIcon.textContent = '⚠';
+            statusActualIcon.className = 'material-icons status-icon-md danger';
+            statusActualIcon.textContent = 'error';
             statusActualText.textContent = 'Konfig-Fehler';
          }
 
          // Mapped banks badge
          statusDbText.textContent = `${data.bankCount} Banken (${data.accountCount} Konten)`;
          if (data.bankCount > 0) {
-            statusDbIcon.className = 'status-icon success';
-            statusDbIcon.textContent = '🏦';
+            statusDbIcon.className = 'material-icons status-icon-md success';
+            statusDbIcon.textContent = 'account_balance';
          } else {
-            statusDbIcon.className = 'status-icon warning';
-            statusDbIcon.textContent = '📭';
+            statusDbIcon.className = 'material-icons status-icon-md warning';
+            statusDbIcon.textContent = 'help_outline';
          }
 
          // Last sync badge
@@ -216,7 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
                <div class="glass-card" style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
                   <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Bislang sind keine Banken konfiguriert.</p>
                   <button class="btn" style="margin: 0 auto;" onclick="document.getElementById('add-bank-btn').click()">
-                     <span>➕</span> Erste Bank einrichten
+                     <span class="material-icons btn-icon">add</span> Erste Bank einrichten
                   </button>
                </div>
             `;
@@ -250,11 +253,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             card.innerHTML = `
-               <div class="bank-card-top">
-                  <div class="bank-card-title">
-                     <h3>${escapeHtml(bank.name)}</h3>
-                     <span class="status-icon success" style="width:24px; height:24px; font-size:0.8rem;">✓</span>
-                  </div>
+                <div class="bank-card-top">
+                   <div class="bank-card-title">
+                      <h3>${escapeHtml(bank.name)}</h3>
+                      <span class="material-icons" style="color: var(--success); font-size: 1.25rem;">check_circle</span>
+                   </div>
                   <div class="bank-meta">
                      <span class="bank-meta-label">URL:</span>
                      <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(bank.fints.url)}</span>
@@ -703,109 +706,149 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (saveNtfyBtn) {
-       saveNtfyBtn.addEventListener('click', async (e) => {
-          e.preventDefault();
-          const topic = ntfyTopicInput.value.trim();
-          const server = ntfyServerInput.value.trim() || 'https://ntfy.sh';
-          
-          try {
-             saveNtfyBtn.disabled = true;
-             saveNtfyBtn.innerHTML = '<span>⏳</span> Speichern...';
-             
-             const res = await fetch('/api/notifications/config', {
-                method: 'POST',
-                headers: {
-                   'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ topic, server })
-             });
-             
-             if (res.ok) {
-                showToast('Push-Konfiguration erfolgreich in DB gespeichert!', 'success');
-                lastSavedTopic = topic;
-                lastSavedServer = server;
-
-                ntfyTopicDisplay.textContent = topic || 'Kein Topic konfiguriert';
-                ntfyServerDisplay.textContent = server;
-                updateNtfySetupGuide(topic, server);
-
-                // Switch back to read-only view
-                ntfyEditView.style.display = 'none';
-                ntfyReadView.style.display = 'flex';
-             } else {
-                const errData = await res.json();
-                showToast(errData.error || 'Fehler beim Speichern der Konfiguration.', 'error');
-             }
-          } catch (err) {
-             showToast('Netzwerkfehler beim Speichern der Konfiguration.', 'error');
-          } finally {
-             saveNtfyBtn.disabled = false;
-             saveNtfyBtn.innerHTML = '<span>💾</span> Speichern';
-          }
-       });
-    }
-     if (btnTestPush) {
-        btnTestPush.addEventListener('click', async (e) => {
+        saveNtfyBtn.addEventListener('click', async (e) => {
            e.preventDefault();
+           const topic = ntfyTopicInput.value.trim();
+           const server = ntfyServerInput.value.trim() || 'https://ntfy.sh';
+           
            try {
-              btnTestPush.disabled = true;
-              btnTestPush.innerHTML = '<span>⏳</span> Sendet...';
+              saveNtfyBtn.disabled = true;
+              saveNtfyBtn.innerHTML = '<span class="material-icons btn-icon spinning-icon">sync</span> Speichern...';
               
-              const res = await fetch('/api/notifications/test', {
-                 method: 'POST'
+              const res = await fetch('/api/notifications/config', {
+                 method: 'POST',
+                 headers: {
+                    'Content-Type': 'application/json'
+                 },
+                 body: JSON.stringify({ topic, server })
               });
               
               if (res.ok) {
-                 showToast('Test-Push erfolgreich gesendet! 🔔', 'success');
+                 showToast('Push-Konfiguration erfolgreich in DB gespeichert!', 'success');
+                 lastSavedTopic = topic;
+                 lastSavedServer = server;
+
+                 ntfyTopicDisplay.textContent = topic || 'Kein Topic konfiguriert';
+                 ntfyServerDisplay.textContent = server;
+                 updateNtfySetupGuide(topic, server);
+
+                 // Switch back to read-only view
+                 ntfyEditView.style.display = 'none';
+                 ntfyReadView.style.display = 'flex';
               } else {
                  const errData = await res.json();
-                 showToast(errData.error || 'Fehler beim Senden des Test-Pushes.', 'error');
+                 showToast(errData.error || 'Fehler beim Speichern der Konfiguration.', 'error');
               }
            } catch (err) {
-              showToast('Netzwerkfehler beim Senden des Test-Pushes.', 'error');
+              console.error('Error saving ntfy config:', err);
+              showToast('Serverfehler beim Speichern.', 'error');
+           } finally {
+              saveNtfyBtn.disabled = false;
+              saveNtfyBtn.innerHTML = '<span class="material-icons btn-icon">save</span> Speichern';
+           }
+        });
+     }
+
+     if (btnTestPush) {
+        btnTestPush.addEventListener('click', async (e) => {
+           e.preventDefault();
+           btnTestPush.disabled = true;
+           const oldText = btnTestPush.innerHTML;
+           btnTestPush.innerHTML = '<span class="material-icons btn-icon spinning-icon">sync</span> Teste...';
+           try {
+              const res = await fetch('/api/notifications/test', { method: 'POST' });
+              const data = await res.json();
+              if (res.ok && data.success) {
+                 showToast('Test-Push erfolgreich gesendet!', 'success');
+              } else {
+                 showToast(data.error || 'Test-Push fehlgeschlagen.', 'error');
+              }
+           } catch (err) {
+              console.error('Test push error:', err);
+              showToast('Netzwerk- oder Serverfehler beim Test-Push.', 'error');
            } finally {
               btnTestPush.disabled = false;
-              btnTestPush.innerHTML = '<span>🔔</span> Testen';
+              btnTestPush.innerHTML = oldText;
            }
         });
      }
 
-     // --- THEME TOGGLE ---
-     if (themeToggleBtn) {
-        const isLight = document.body.classList.contains('light-theme');
-        themeToggleBtn.innerHTML = isLight ? '<span>🌙</span>' : '<span>☀️</span>';
+     // --- THEME MANAGEMENT ---
+     const applyTheme = () => {
+        const themeAuto = localStorage.getItem('theme_auto') !== 'false';
+        const savedTheme = localStorage.getItem('theme') || 'dark';
 
-        themeToggleBtn.addEventListener('click', (e) => {
+        if (settingsSystemTheme) {
+           settingsSystemTheme.checked = themeAuto;
+        }
+
+        if (themeAuto) {
+           if (manualThemeGroup) manualThemeGroup.classList.add('disabled');
+           if (themeBtnDark) themeBtnDark.classList.remove('active');
+           if (themeBtnLight) themeBtnLight.classList.remove('active');
+
+           const systemPrefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+           if (systemPrefersLight) {
+              document.body.classList.add('light-theme');
+           } else {
+              document.body.classList.remove('light-theme');
+           }
+        } else {
+           if (manualThemeGroup) manualThemeGroup.classList.remove('disabled');
+           
+           if (savedTheme === 'light') {
+              document.body.classList.add('light-theme');
+              if (themeBtnLight) themeBtnLight.classList.add('active');
+              if (themeBtnDark) themeBtnDark.classList.remove('active');
+           } else {
+              document.body.classList.remove('light-theme');
+              if (themeBtnDark) themeBtnDark.classList.add('active');
+              if (themeBtnLight) themeBtnLight.classList.remove('active');
+           }
+        }
+     };
+
+     if (settingsSystemTheme) {
+        settingsSystemTheme.addEventListener('change', () => {
+           localStorage.setItem('theme_auto', settingsSystemTheme.checked ? 'true' : 'false');
+           applyTheme();
+           showToast(settingsSystemTheme.checked ? 'Systemeinstellung für Design aktiviert' : 'Manuelle Design-Auswahl aktiviert', 'info');
+        });
+     }
+
+     if (themeBtnDark) {
+        themeBtnDark.addEventListener('click', (e) => {
            e.preventDefault();
-           const isLightNow = document.body.classList.toggle('light-theme');
-           localStorage.setItem('theme', isLightNow ? 'light' : 'dark');
-           themeToggleBtn.innerHTML = isLightNow ? '<span>🌙</span>' : '<span>☀️</span>';
-           showToast(isLightNow ? 'Helles Design aktiviert! ☀️' : 'Dunkles Design aktiviert! 🌙', 'info');
+           localStorage.setItem('theme_auto', 'false');
+           localStorage.setItem('theme', 'dark');
+           applyTheme();
+           showToast('Dunkles Design aktiviert', 'info');
         });
      }
 
-     // Listen for system/browser color scheme changes dynamically
-     const systemThemeMedia = window.matchMedia('(prefers-color-scheme: light)');
-     if (systemThemeMedia && typeof systemThemeMedia.addEventListener === 'function') {
-        systemThemeMedia.addEventListener('change', (e) => {
-           // Only update theme dynamically if the user hasn't explicitly set a preference in localStorage
-           if (!localStorage.getItem('theme')) {
-              const isLightNow = e.matches;
-              if (isLightNow) {
-                 document.body.classList.add('light-theme');
-              } else {
-                 document.body.classList.remove('light-theme');
-              }
-              if (themeToggleBtn) {
-                 themeToggleBtn.innerHTML = isLightNow ? '<span>🌙</span>' : '<span>☀️</span>';
-              }
-           }
+     if (themeBtnLight) {
+        themeBtnLight.addEventListener('click', (e) => {
+           e.preventDefault();
+           localStorage.setItem('theme_auto', 'false');
+           localStorage.setItem('theme', 'light');
+           applyTheme();
+           showToast('Helles Design aktiviert', 'info');
         });
      }
 
-     // --- INITIAL LOADING ---
-    loadStatus();
-    loadNtfyTopic();
+     const mediaQuery = window.matchMedia('(prefers-color-scheme: light)');
+     if (mediaQuery.addEventListener) {
+        mediaQuery.addEventListener('change', () => {
+           const themeAuto = localStorage.getItem('theme_auto') !== 'false';
+           if (themeAuto) applyTheme();
+        });
+     }
+
+     // --- INITIALIZATION ---
+     loadStatus();
+     loadBanks();
+     loadNtfyTopic();
+     applyTheme();
 
    // --- HELPERS ---
    function maskIban(iban) {

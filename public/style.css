@@ -222,21 +222,51 @@ header {
    gap: 0.75rem;
 }
 
-#theme-toggle-btn {
-   padding: 0;
-   width: 40px;
-   height: 40px;
-   border-radius: 50% !important;
-   display: flex;
+/* Google Material Icons Integration */
+.material-icons {
+   font-family: 'Material Icons';
+   font-weight: normal;
+   font-style: normal;
+   font-size: 20px; /* Standard UI icon size */
+   line-height: 1;
+   letter-spacing: normal;
+   text-transform: none;
+   display: inline-flex;
    align-items: center;
    justify-content: center;
-   font-size: 1.1rem;
-   cursor: pointer;
-   transition: var(--transition-fast);
+   vertical-align: middle;
+   white-space: nowrap;
+   word-wrap: normal;
+   direction: ltr;
+   -webkit-font-feature-settings: 'liga';
+   -webkit-font-smoothing: antialiased;
+   transition: transform var(--transition-fast);
 }
 
-#theme-toggle-btn:hover {
-   transform: rotate(15deg) scale(1.05);
+/* Specific adjustments for nav tabs and buttons */
+.nav-tab .material-icons,
+.btn .material-icons {
+   font-size: 1.15rem;
+}
+
+.nav-tab .material-icons {
+   margin-right: 0.35rem;
+}
+
+.btn .material-icons.btn-icon {
+   margin-right: 0.5rem;
+   font-size: 1.2rem;
+}
+
+/* Spinning Animation for sync/loading icons */
+@keyframes spin {
+   from { transform: rotate(0deg); }
+   to { transform: rotate(360deg); }
+}
+
+.spinning-icon {
+   animation: spin 1.2s linear infinite;
+   display: inline-flex !important;
 }
 
 /* Main Grid & Pages */
@@ -1079,3 +1109,123 @@ header {
    }
 }
 
+/* ── SETTINGS PAGE & SWITCH STYLING ──────────────────────────────── */
+.settings-grid {
+   display: grid;
+   grid-template-columns: 1fr 1.1fr;
+   gap: 1.5rem;
+   align-items: start;
+}
+
+@media (max-width: 900px) {
+   .settings-grid {
+      grid-template-columns: 1fr;
+   }
+}
+
+/* Premium IOS-style Switch Toggle */
+.checkbox-wrapper {
+   position: relative;
+   display: inline-flex;
+   align-items: center;
+}
+
+.checkbox-input {
+   opacity: 0;
+   width: 0;
+   height: 0;
+   position: absolute;
+}
+
+.checkbox-label {
+   display: block;
+   width: 46px;
+   height: 24px;
+   background: var(--btn-sec-bg);
+   border: 1px solid var(--input-border);
+   border-radius: 12px;
+   position: relative;
+   cursor: pointer;
+   transition: var(--transition-fast);
+}
+
+.checkbox-label::after {
+   content: '';
+   display: block;
+   width: 18px;
+   height: 18px;
+   background: var(--text-primary);
+   border-radius: 50%;
+   position: absolute;
+   top: 2px;
+   left: 2px;
+   transition: var(--transition-fast);
+}
+
+.checkbox-input:checked + .checkbox-label {
+   background: var(--accent-primary);
+   border-color: var(--accent-primary);
+}
+
+.checkbox-input:checked + .checkbox-label::after {
+   left: 24px;
+   background: #ffffff;
+   box-shadow: 0 2px 8px var(--glow-primary);
+}
+
+.checkbox-input:focus-visible + .checkbox-label {
+   outline: 2px solid var(--accent-primary);
+   outline-offset: 2px;
+}
+
+/* Manual Theme Buttons Selection */
+.theme-select-btn {
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   gap: 0.5rem;
+   font-weight: 500;
+   transition: var(--transition-fast);
+}
+
+.theme-select-btn.active {
+   background: var(--accent-primary) !important;
+   border-color: var(--accent-primary) !important;
+   color: #ffffff !important;
+   box-shadow: 0 4px 12px var(--glow-primary);
+}
+
+#manual-theme-group.disabled {
+   opacity: 0.45;
+   pointer-events: none;
+   cursor: not-allowed;
+}
+
+/* Fixes/Improvements for general Material Icons inside buttons and cards */
+.status-icon-md {
+   width: 48px;
+   height: 48px;
+   border-radius: 50%;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   font-size: 1.5rem !important;
+}
+
+.status-icon-md.success {
+   background: rgba(16, 185, 129, 0.1);
+   color: var(--success);
+   border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.status-icon-md.warning {
+   background: rgba(245, 158, 11, 0.1);
+   color: var(--warning);
+   border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.status-icon-md.danger {
+   background: rgba(239, 68, 68, 0.1);
+   color: var(--danger);
+   border: 1px solid rgba(239, 68, 68, 0.2);
+}
