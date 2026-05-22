@@ -1,5 +1,3 @@
-const ntfyTopic = process.env.NTFY_TOPIC;
-const ntfyServer = process.env.NTFY_SERVER || 'https://ntfy.sh';
 const webpush = require('web-push');
 const { CredentialsStore } = require('../lib/credentials-store');
 
@@ -92,69 +90,10 @@ function formatDate(dateStr) {
 }
 
 /**
- * Helper to encode non-ASCII header values using RFC 2047 MIME encoded-words.
- * This prevents the undici/fetch "ByteString" validation error with emojis/unicode.
- * @param {string} value
- * @returns {string}
- */
-function encodeHeaderValue(value) {
-   if (!value) return '';
-   const hasNonAscii = /[^\x00-\x7F]/.test(value);
-   if (!hasNonAscii) return value;
-   return `=?utf-8?B?${Buffer.from(value, 'utf8').toString('base64')}?=`;
-}
-
-/**
- * Sends a push notification via ntfy.sh.
- * @param {string} title 
- * @param {string} message 
- * @param {string} tags 
- * @param {string} priority - 'min', 'low', 'default', 'high', 'urgent'
- * @param {string} [overrideTopic]
- * @param {string} [overrideServer]
- */
-async function sendNtfy(title, message, tags = '', priority = 'default', overrideTopic = null, overrideServer = null) {
-   const topic = overrideTopic ?? ntfyTopic;
-   const server = overrideServer ?? ntfyServer;
-
-   if (!topic) {
-      throw new Error('Push-Notification übersprungen: ntfy Topic ist nicht definiert.');
-   }
-
-   const serverBase = server.endsWith('/') ? server.slice(0, -1) : server;
-   const url = `${serverBase}/${topic}`;
-
-   const headers = {
-      'Priority': priority,
-      'Content-Type': 'text/plain; charset=utf-8'
-   };
-
-   if (title) {
-      headers['Title'] = encodeHeaderValue(title);
-   }
-   if (tags) {
-      headers['Tags'] = encodeHeaderValue(tags);
-   }
-
-   const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: message
-   });
-
-   if (!response.ok) {
-      const errText = await response.text().catch(() => '');
-      throw new Error(`Fehler beim Senden der Push-Benachrichtigung: HTTP ${response.status}${errText ? ` - ${errText}` : ''}`);
-   }
-}
-
-/**
  * Analyzes the import results and sends a success notification.
  * @param {Array} results 
- * @param {string} [overrideTopic]
- * @param {string} [overrideServer]
  */
-async function sendSuccessNotification(results, overrideTopic = null, overrideServer = null) {
+async function sendSuccessNotification(results) {
    if (!results || !Array.isArray(results)) return;
 
    // Filter for accounts that have new transactions
@@ -163,13 +102,9 @@ async function sendSuccessNotification(results, overrideTopic = null, overrideSe
 
    let title = '';
    let message = '';
-   let tags = '';
-   let priority = 'default';
 
    if (totalAdded > 0) {
       title = totalAdded === 1 ? '1 neuer Umsatz importiert 🏦' : `${totalAdded} neue Umsätze importiert 🏦`;
-      tags = 'money_with_wings,bank';
-      priority = 'default'; // normal notification
 
       const lines = [];
       for (const res of accountsWithNew) {
@@ -187,19 +122,10 @@ async function sendSuccessNotification(results, overrideTopic = null, overrideSe
    } else {
       // Silent notification for successful run without any new transactions
       title = 'FinTS-Import erfolgreich 🔄';
-      tags = 'white_check_mark,sleepy';
-      priority = 'min'; // silent, won't buzz/vibrate, just in history
       message = 'Alle Konten sind auf dem neuesten Stand. Keine neuen Umsätze gefunden.';
    }
 
-   // 1. Send via standard ntfy
-   try {
-      await sendNtfy(title, message, tags, priority, overrideTopic, overrideServer);
-   } catch (error) {
-      console.error('Fehler bei der ntfy Push-Benachrichtigungs-Übertragung:', error.message);
-   }
-
-   // 2. Send via native Web-Push (PWA)
+   // Send via native Web-Push (PWA)
    try {
       await sendWebPush(title, message);
    } catch (error) {
@@ -210,27 +136,16 @@ async function sendSuccessNotification(results, overrideTopic = null, overrideSe
 /**
  * Sends a failure notification with error details.
  * @param {Error|string} error 
- * @param {string} [overrideTopic]
- * @param {string} [overrideServer]
  */
-async function sendFailureNotification(error, overrideTopic = null, overrideServer = null) {
+async function sendFailureNotification(error) {
    const title = 'FinTS-Import FEHLGESCHLAGEN 🚨';
-   const tags = 'warning,skull';
-   const priority = 'high'; // high alert, will ring/vibrate
 
    const message = `Fehler beim Ausführen der Bank-Synchronisation!
 
 Fehlermeldung:
 ${error?.message || error || 'Unbekannter Fehler'}`;
 
-   // 1. Send via standard ntfy
-   try {
-      await sendNtfy(title, message, tags, priority, overrideTopic, overrideServer);
-   } catch (error) {
-      console.error('Fehler bei der ntfy Push-Benachrichtigungs-Übertragung:', error.message);
-   }
-
-   // 2. Send via native Web-Push (PWA)
+   // Send via native Web-Push (PWA)
    try {
       await sendWebPush(title, message);
    } catch (error) {
@@ -240,7 +155,6 @@ ${error?.message || error || 'Unbekannter Fehler'}`;
 
 module.exports = {
    sendSuccessNotification,
-   sendFailureNotification,
-   sendNtfy
+   sendFailureNotification
 };
 

@@ -59,8 +59,14 @@ const main = async () => {
    }
 
    const budgetClient = new BudgetClient(actualConfig);
-   await budgetClient.loadBudget();
-   await budgetClient.getAccounts();
+   try {
+      await budgetClient.loadBudget();
+      await budgetClient.getAccounts();
+   } catch (err) {
+      console.error('Fehler bei der Verbindung zu Actual Budget:', err.message);
+      await sendFailureNotification(new Error(`Verbindung zu Actual Budget fehlgeschlagen: ${err.message}`));
+      throw err;
+   }
 
    const results = [];
 
@@ -74,6 +80,7 @@ const main = async () => {
          await fintsClient.loadAccounts();
       } catch (err) {
          console.error(`Fehler bei Bank "${bank.name}":`, err.message);
+         await sendFailureNotification(new Error(`Verbindung zur Bank "${bank.name}" fehlgeschlagen: ${err.message}`));
          continue;
       }
 
@@ -120,13 +127,23 @@ const main = async () => {
                   };
                });
 
-               results.push({
+               const accountResult = {
                   account: accountMapping.actualAccountName,
                   added,
                   updated,
                   ignored: budgetTransactions.length - added,
                   transactions: txDetails
-               });
+               };
+
+               results.push(accountResult);
+
+               if (added > 0) {
+                  try {
+                     await sendSuccessNotification([accountResult]);
+                  } catch (notificationErr) {
+                     console.error('Fehler beim Senden der Erfolgsbenachrichtigung:', notificationErr.message);
+                  }
+               }
             }
          } catch (err) {
             console.error('Fehler beim Verarbeiten von Konto', maskIban(accountMapping.iban), err.message);
@@ -140,41 +157,11 @@ const main = async () => {
 
 if (require.main === module) {
    main()
-      .then(async results => {
+      .then(results => {
          console.log(JSON.stringify(results));
-         const masterKey = process.env.MASTER_KEY;
-         let ntfyTopic = '';
-         let ntfyServer = 'https://ntfy.sh';
-         if (masterKey) {
-            const store = new CredentialsStore(masterKey);
-            try {
-               ntfyTopic = store.getConfig('ntfy_topic');
-               ntfyServer = store.getConfig('ntfy_server') || 'https://ntfy.sh';
-            } catch (e) {
-               console.error('Fehler beim Laden der Notification-Config aus DB:', e.message);
-            } finally {
-               store.close();
-            }
-         }
-         await sendSuccessNotification(results, ntfyTopic, ntfyServer);
       })
-      .catch(async err => {
+      .catch(err => {
          console.error('Unhandled error in main:', err);
-         const masterKey = process.env.MASTER_KEY;
-         let ntfyTopic = '';
-         let ntfyServer = 'https://ntfy.sh';
-         if (masterKey) {
-            const store = new CredentialsStore(masterKey);
-            try {
-               ntfyTopic = store.getConfig('ntfy_topic');
-               ntfyServer = store.getConfig('ntfy_server') || 'https://ntfy.sh';
-            } catch (e) {
-               console.error('Fehler beim Laden der Notification-Config aus DB:', e.message);
-            } finally {
-               store.close();
-            }
-         }
-         await sendFailureNotification(err, ntfyTopic, ntfyServer);
          process.exitCode = 1;
       });
 }

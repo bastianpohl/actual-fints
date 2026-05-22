@@ -5,7 +5,6 @@ const path = require('node:path');
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const { CredentialsStore } = require('./lib/credentials-store');
-const { sendNtfy } = require('./utils/notifications');
 
 const app = express();
 app.use(express.json());
@@ -1130,47 +1129,6 @@ const setEnvValue = (key, value) => {
    fs.writeFileSync(ENV_FILE, newLines.join('\n'), 'utf8');
 };
 
-// GET /api/notifications/config - Retrieve the current ntfy config
-app.get('/api/notifications/config', (req, res) => {
-   const masterKey = process.env.MASTER_KEY;
-   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht gesetzt.' });
-
-   let store;
-   try {
-      store = new CredentialsStore(masterKey);
-      const topic = store.getConfig('ntfy_topic') || '';
-      const server = store.getConfig('ntfy_server') || 'https://ntfy.sh';
-      return res.json({ topic, server });
-   } catch (err) {
-      return res.status(500).json({ error: err.message });
-   } finally {
-      if (store) store.close();
-   }
-});
-
-// POST /api/notifications/config - Save the ntfy config
-app.post('/api/notifications/config', (req, res) => {
-   const masterKey = process.env.MASTER_KEY;
-   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht gesetzt.' });
-
-   const { topic, server } = req.body ?? {};
-   if (topic === undefined || server === undefined) {
-      return res.status(400).json({ error: 'Topic und Server-URL sind erforderlich.' });
-   }
-
-   let store;
-   try {
-      store = new CredentialsStore(masterKey);
-      store.setConfig('ntfy_topic', topic.trim());
-      store.setConfig('ntfy_server', server.trim());
-      return res.json({ success: true, topic: topic.trim(), server: server.trim() });
-   } catch (err) {
-      return res.status(500).json({ error: err.message });
-   } finally {
-      if (store) store.close();
-   }
-});
-
 // GET /api/budget/config - Retrieve Actual Budget connection config
 app.get('/api/budget/config', (req, res) => {
    const masterKey = process.env.MASTER_KEY;
@@ -1221,44 +1179,6 @@ app.post('/api/budget/config', (req, res) => {
       return res.status(500).json({ error: err.message });
    } finally {
       if (store) store.close();
-   }
-});
-
-// POST /api/notifications/test - Trigger a test notification
-app.post('/api/notifications/test', async (req, res) => {
-   const masterKey = process.env.MASTER_KEY;
-   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht gesetzt.' });
-
-   let store;
-   let topic = '';
-   let server = 'https://ntfy.sh';
-   try {
-      store = new CredentialsStore(masterKey);
-      topic = store.getConfig('ntfy_topic');
-      server = store.getConfig('ntfy_server') || 'https://ntfy.sh';
-   } catch (err) {
-      return res.status(500).json({ error: err.message });
-   } finally {
-      if (store) store.close();
-   }
-
-   if (!topic) {
-      return res.status(400).json({ error: 'Es ist noch kein Push-Topic konfiguriert.' });
-   }
-
-   try {
-      const timestamp = new Date().toLocaleString('de-DE');
-      await sendNtfy(
-         'Test-Push erfolgreich! 🎉',
-         `Deine Push-Benachrichtigungen für actual-fints wurden erfolgreich konfiguriert.\n\nUhrzeit: ${timestamp}`,
-         'tada,sparkles,iphone',
-         'default',
-         topic,
-         server
-      );
-      return res.json({ success: true });
-   } catch (err) {
-      return res.status(500).json({ error: err.message });
    }
 });
 

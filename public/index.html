@@ -413,78 +413,7 @@
                    </div>
                 </div>
 
-               <!-- Push-Benachrichtigungen Box -->
-               <div class="glass-card" style="display:flex; flex-direction:column; justify-content:space-between; height: auto;">
-                  <div>
-                     <h2 style="font-size:1.2rem; font-weight:600; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
-                        <span class="material-icons" style="color: var(--accent-primary);">notifications</span> Push-Notifications
-                     </h2>
-                     <p style="color: var(--text-secondary); font-size:0.8rem; margin-bottom:1rem; line-height:1.4;">
-                        Erhalte kostenlose Push-Mitteilungen bei neuen Umsätzen direkt auf dein Smartphone via <strong>ntfy.sh</strong>.
-                     </p>
 
-                     <!-- 1. READ-ONLY VIEW (Default) -->
-                     <div id="ntfy-read-view" style="display:flex; flex-direction:column; gap:0.75rem; font-size:0.9rem;">
-                        <div class="form-group" style="margin-bottom:0.25rem;">
-                           <span style="font-size:0.75rem; color: var(--text-secondary);">Geheimes Topic (ntfy.sh)</span>
-                           <div style="display:flex; align-items:center; justify-content:space-between; background: var(--display-bg); border: 1px solid var(--display-border); padding: 0.4rem 0.6rem; border-radius: 8px; margin-top: 0.25rem; min-height:36px;">
-                              <span id="ntfy-topic-display" style="font-family: var(--font-mono); font-size:0.85rem; word-break:break-all; color: var(--text-primary);">-</span>
-                              <button class="btn secondary" id="btn-copy-topic" style="padding:0; width:28px; height:28px; display:flex; align-items:center; justify-content:center; margin-left: 0.5rem;" title="Kopieren">
-                                 <span class="material-icons" style="font-size:1.1rem;">content_copy</span>
-                              </button>
-                           </div>
-                        </div>
-                        <div class="form-group" style="margin-bottom:0.25rem;">
-                           <span style="font-size:0.75rem; color: var(--text-secondary);">Server</span>
-                           <div style="display:flex; align-items:center; justify-content:space-between; background: var(--display-bg); border: 1px solid var(--display-border); padding: 0.4rem 0.6rem; border-radius: 8px; margin-top: 0.25rem; min-height:36px;">
-                              <span id="ntfy-server-display" style="font-family: var(--font-mono); font-size:0.85rem; word-break:break-all; color: var(--text-primary);">https://ntfy.sh</span>
-                              <button class="btn secondary" id="btn-copy-server" style="padding:0; width:28px; height:28px; display:flex; align-items:center; justify-content:center; margin-left: 0.5rem;" title="Kopieren">
-                                 <span class="material-icons" style="font-size:1.1rem;">content_copy</span>
-                              </button>
-                           </div>
-                        </div>
-                        <div style="font-size:0.75rem; line-height:1.4; color: var(--text-muted);" id="ntfy-setup-guide-read">
-                           Abonniere das Topic in der iOS-App, um Push-Mitteilungen zu aktivieren.
-                        </div>
-                        <div style="display:flex; gap:0.5rem; margin-top:1.25rem; width:100%;">
-                           <button class="btn secondary" id="btn-switch-to-edit" style="flex:1;">
-                              <span class="material-icons btn-icon">edit</span> Editieren
-                           </button>
-                           <button class="btn secondary" id="btn-test-push" style="flex:1;">
-                              <span class="material-icons btn-icon">notifications_active</span> Testen
-                           </button>
-                        </div>
-                     </div>
-
-                     <!-- 2. EDIT VIEW (Hidden by default) -->
-                     <div id="ntfy-edit-view" style="display:none; flex-direction:column; gap:0.75rem; font-size:0.9rem;">
-                        <div class="form-group" style="margin-bottom:0.25rem;">
-                           <label for="ntfy-topic-input" style="font-size:0.75rem; color: var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
-                              Geheimes Topic (ntfy.sh)
-                              <button id="btn-show-topic" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.75rem; padding:0; outline:none;">Anzeigen</button>
-                           </label>
-                           <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
-                              <input type="password" id="ntfy-topic-input" class="input-field" style="font-family: var(--font-mono); font-size:0.85rem; padding:0.4rem 0.6rem; height:36px;" placeholder="Kein Topic konfiguriert">
-                              <button class="btn secondary" id="btn-generate-topic" style="padding:0; width:36px; height:36px; display:flex; align-items:center; justify-content:center;" title="Zufälliges Topic generieren">
-                                 <span class="material-icons">casino</span>
-                              </button>
-                           </div>
-                        </div>
-                        <div class="form-group" style="margin-bottom:0.25rem;">
-                           <label for="ntfy-server-input" style="font-size:0.75rem; color: var(--text-secondary);">
-                              Alternativer ntfy-Server (Optional)
-                           </label>
-                           <input type="url" id="ntfy-server-input" class="input-field" style="font-size:0.85rem; padding:0.4rem 0.6rem; height:36px; margin-top:0.25rem;" placeholder="https://ntfy.sh">
-                        </div>
-                        <div style="display:flex; gap:0.5rem; margin-top:1.25rem;">
-                           <button class="btn secondary" id="btn-cancel-edit" style="flex:1;">Abbrechen</button>
-                           <button class="btn" id="save-ntfy-btn" style="flex:1;">
-                              <span class="material-icons btn-icon">save</span> Speichern
-                           </button>
-                        </div>
-                  </div>
-               </div>
-            </div>
 
             <!-- PWA Web-Push Box -->
             <div class="glass-card">
