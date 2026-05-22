@@ -227,11 +227,11 @@
                   </div>
                </div>
 
-               <!-- System- & Verbindungskonfiguration Settings Card -->
+               <!-- Systemkonfiguration Settings Card -->
                <div class="glass-card">
                   <h2 style="font-size:1.2rem; font-weight:600; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem; justify-content:space-between;">
                      <div style="display:flex; align-items:center; gap:0.5rem;">
-                        <span class="material-icons" style="color: var(--accent-primary);">settings_suggest</span> System- & Verbindungskonfiguration
+                        <span class="material-icons" style="color: var(--accent-primary);">settings_suggest</span> Systemkonfiguration
                      </div>
                      <span id="config-master-key" class="account-actual-name" style="color:var(--success); font-weight:500; font-size:0.75rem; background:rgba(16, 185, 129, 0.1); padding: 0.25rem 0.5rem; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.25);">Gefunden</span>
                   </h2>
@@ -254,6 +254,37 @@
                         <span style="font-size:0.75rem; color: var(--text-secondary);">Verbindungs-Passwort</span>
                         <div style="display:flex; align-items:center; justify-content:space-between; background: var(--display-bg); border: 1px solid var(--display-border); padding: 0.4rem 0.6rem; border-radius: 8px; margin-top: 0.25rem; min-height:36px;">
                            <span id="ab-pass-status" style="font-size:0.85rem; color: var(--text-primary);">-</span>
+                        </div>
+                     </div>
+                     
+                     <!-- Automatischer Hintergrund-Sync Details -->
+                     <div style="margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px dashed var(--display-border);">
+                        <h3 style="font-size:0.85rem; font-weight:600; color: var(--accent-primary); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.35rem;">
+                           <span class="material-icons" style="font-size:1.1rem;">schedule</span> Automatischer Hintergrund-Sync
+                        </h3>
+                        
+                        <div class="form-group" style="margin-bottom:0.5rem;">
+                           <span style="font-size:0.75rem; color: var(--text-secondary);">Intervall (Cron)</span>
+                           <div style="display:flex; align-items:center; background: var(--display-bg); border: 1px solid var(--display-border); padding: 0.4rem 0.6rem; border-radius: 8px; margin-top: 0.25rem; min-height:36px;">
+                              <span id="cron-schedule-display" style="font-family: var(--font-mono); font-size:0.85rem; color: var(--text-primary);">-</span>
+                           </div>
+                        </div>
+                        
+                        <div class="form-group" style="margin-bottom:0.5rem;">
+                           <span style="font-size:0.75rem; color: var(--text-secondary);">Letzter Cron-Sync</span>
+                           <div style="display:flex; align-items:center; justify-content:space-between; background: var(--display-bg); border: 1px solid var(--display-border); padding: 0.4rem 0.6rem; border-radius: 8px; margin-top: 0.25rem; min-height:36px;">
+                              <span id="cron-last-display" style="font-size:0.85rem; color: var(--text-primary);">-</span>
+                              <button class="btn secondary" id="btn-view-cron-log" style="padding: 0 0.5rem; height: 26px; font-size: 0.75rem; display: none; align-items: center; gap: 0.25rem;">
+                                 <span class="material-icons" style="font-size:0.95rem;">terminal</span> Log
+                              </button>
+                           </div>
+                        </div>
+                        
+                        <div class="form-group" style="margin-bottom:0.25rem;">
+                           <span style="font-size:0.75rem; color: var(--text-secondary);">Nächster Cron-Sync</span>
+                           <div style="display:flex; align-items:center; background: var(--display-bg); border: 1px solid var(--display-border); padding: 0.4rem 0.6rem; border-radius: 8px; margin-top: 0.25rem; min-height:36px;">
+                              <span id="cron-next-display" style="font-size:0.85rem; color: var(--text-primary);">-</span>
+                           </div>
                         </div>
                      </div>
                      
@@ -444,6 +475,39 @@
                   </div>
                </div>
             </form>
+         </div>
+      </div>
+
+      <!-- Modal: Cron Log Viewer -->
+      <div class="modal-backdrop" id="cron-log-modal">
+         <div class="glass-card modal-card" style="max-width: 700px; width: 90%;">
+            <div class="modal-header">
+               <h2 style="display:flex; align-items:center; gap:0.5rem; margin:0;">
+                  <span class="material-icons" style="color: var(--accent-primary);">terminal</span> Letzter Cron-Sync Log
+               </h2>
+               <button class="close-btn" id="cron-log-close-btn">
+                  <span class="material-icons">close</span>
+               </button>
+            </div>
+            
+            <div class="terminal-container" style="background: #1e1e24; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; height: 400px; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); margin-bottom: 1.25rem;">
+               <!-- Terminal Header -->
+               <div style="background: #2d2d34; padding: 0.5rem 1rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); user-select: none;">
+                  <div style="display: flex; gap: 0.4rem;">
+                     <span style="width: 10px; height: 10px; border-radius: 50%; background: #ff5f56; display: inline-block;"></span>
+                     <span style="width: 10px; height: 10px; border-radius: 50%; background: #ffbd2e; display: inline-block;"></span>
+                     <span style="width: 10px; height: 10px; border-radius: 50%; background: #27c93f; display: inline-block;"></span>
+                  </div>
+                  <span style="font-family: var(--font-mono); font-size: 0.75rem; color: #a1a1b5;">sync.log — bash</span>
+                  <span style="width: 38px;"></span>
+               </div>
+               <!-- Terminal Content -->
+               <pre id="cron-log-content" style="flex: 1; padding: 1rem; margin: 0; overflow-y: auto; font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.4; color: #f8f8f2; white-space: pre-wrap; word-break: break-all; background: #1e1e24; text-align: left;"></pre>
+            </div>
+            
+            <div class="modal-actions" style="display: flex; justify-content: flex-end;">
+               <button class="btn" id="cron-log-ok-btn" style="min-width: 100px;">Schließen</button>
+            </div>
          </div>
       </div>
 

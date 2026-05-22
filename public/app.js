@@ -4,6 +4,13 @@ document.addEventListener('DOMContentLoaded', () => {
    // --- STATE ---
    let currentBanks = [];
    let syncIntervalId = null;
+   let lastCronSyncLog = '';
+
+   // Cron Log Selectors
+   const cronLogModal = document.getElementById('cron-log-modal');
+   const cronLogContent = document.getElementById('cron-log-content');
+   const cronLogCloseBtn = document.getElementById('cron-log-close-btn');
+   const cronLogOkBtn = document.getElementById('cron-log-ok-btn');
 
    // --- SELECTORS ---
    const tabs = document.querySelectorAll('.nav-tab');
@@ -201,6 +208,38 @@ document.addEventListener('DOMContentLoaded', () => {
           // Populate System info block
           configMasterKey.textContent = data.masterKeyConfigured ? 'Konfiguriert (AES-GCM)' : 'Fehlt';
           configMasterKey.style.color = data.masterKeyConfigured ? 'var(--success)' : 'var(--danger)';
+
+          // Populate Cron Sync details
+          const cronScheduleDisplay = document.getElementById('cron-schedule-display');
+          const cronLastDisplay = document.getElementById('cron-last-display');
+          const cronNextDisplay = document.getElementById('cron-next-display');
+          const btnViewCronLog = document.getElementById('btn-view-cron-log');
+
+          if (cronScheduleDisplay) {
+             cronScheduleDisplay.textContent = data.cronSchedule || '59 7-23/4 * * 1-6';
+          }
+
+          if (cronLastDisplay) {
+             if (data.lastCronSync) {
+                const d = new Date(data.lastCronSync);
+                cronLastDisplay.textContent = isNaN(d.getTime()) ? data.lastCronSync : d.toLocaleString('de-DE');
+                if (btnViewCronLog) btnViewCronLog.style.display = 'flex';
+             } else {
+                cronLastDisplay.textContent = 'Nie';
+                if (btnViewCronLog) btnViewCronLog.style.display = 'none';
+             }
+          }
+
+          if (cronNextDisplay) {
+             if (data.nextCronSync) {
+                const d = new Date(data.nextCronSync);
+                cronNextDisplay.textContent = isNaN(d.getTime()) ? data.nextCronSync : d.toLocaleString('de-DE');
+             } else {
+                cronNextDisplay.textContent = 'Nicht geplant';
+             }
+          }
+
+          lastCronSyncLog = data.lastCronSyncLog || '';
  
           // Actual Budget settings are loaded separately by loadAbConfig()
 
@@ -1142,6 +1181,53 @@ document.addEventListener('DOMContentLoaded', () => {
            if (themeAuto) applyTheme();
         });
      }
+
+      // --- CRON LOG MODAL HANDLERS ---
+      const openCronLogModal = () => {
+         if (cronLogContent) {
+            cronLogContent.textContent = lastCronSyncLog || 'Keine Logs vorhanden.';
+         }
+         if (cronLogModal) {
+            cronLogModal.classList.add('show');
+         }
+      };
+
+      const closeCronLogModal = () => {
+         if (cronLogModal) {
+            cronLogModal.classList.remove('show');
+         }
+      };
+
+      const btnViewCronLog = document.getElementById('btn-view-cron-log');
+      if (btnViewCronLog) {
+         btnViewCronLog.addEventListener('click', (e) => {
+            e.preventDefault();
+            openCronLogModal();
+         });
+      }
+
+      if (cronLogCloseBtn) {
+         cronLogCloseBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeCronLogModal();
+         });
+      }
+
+      if (cronLogOkBtn) {
+         cronLogOkBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeCronLogModal();
+         });
+      }
+
+      // Close modal on outside click
+      if (cronLogModal) {
+         cronLogModal.addEventListener('click', (e) => {
+            if (e.target === cronLogModal) {
+               closeCronLogModal();
+            }
+         });
+      }
 
      // --- INITIALIZATION ---
      loadStatus();

@@ -61,6 +61,136 @@ const restartServiceInBackground = () => {
 
 // ── Web UI Support API Endpoints ─────────────────────────────────────
 
+// --- Cron Scheduler Helper Functions ---
+const getCronSchedule = () => {
+   const crontabPath = '/etc/crontab';
+   if (fs.existsSync(crontabPath)) {
+      try {
+         const content = fs.readFileSync(crontabPath, 'utf8');
+         const lines = content.split('\n');
+         for (const line of lines) {
+            if (line.includes('actual-fints') && (line.includes('npm start') || line.includes('main.js') || line.includes('cron-run.js'))) {
+               const parts = line.trim().split(/\s+/);
+               if (parts.length >= 6) {
+                  return parts.slice(0, 5).join(' ');
+               }
+            }
+         }
+      } catch (e) {
+         console.error('Error reading /etc/crontab:', e);
+      }
+   }
+   return '59 7-23/4 * * 1-6';
+};
+
+const getLastCronSync = () => {
+   if (fs.existsSync(LOG_FILE)) {
+      try {
+         const content = fs.readFileSync(LOG_FILE, 'utf8');
+         const regex = /\[(.*?)\] --- CRON SYNC START ---/g;
+         let lastTimestamp = null;
+         let lastLog = '';
+         
+         const matches = [...content.matchAll(regex)];
+         if (matches.length > 0) {
+            const lastMatch = matches[matches.length - 1];
+            lastTimestamp = lastMatch[1];
+            
+            const startIndex = lastMatch.index;
+            const nextSyncIndex = content.indexOf('--- SYNC START', startIndex + 1);
+            const nextCronIndex = content.indexOf('--- CRON SYNC START', startIndex + 1);
+            let endIndex = content.length;
+            
+            if (nextSyncIndex !== -1 && nextCronIndex !== -1) {
+               endIndex = Math.min(nextSyncIndex, nextCronIndex);
+            } else if (nextSyncIndex !== -1) {
+               endIndex = nextSyncIndex;
+            } else if (nextCronIndex !== -1) {
+               endIndex = nextCronIndex;
+            }
+            
+            lastLog = content.substring(startIndex, endIndex).trim();
+         }
+         return { timestamp: lastTimestamp, log: lastLog };
+      } catch (e) {
+         console.error('Error reading last cron sync:', e);
+      }
+   }
+   return { timestamp: null, log: '' };
+};
+
+const matchCronField = (field, value, min, max) => {
+   if (field === '*') return true;
+   const parts = field.split(',');
+   for (const part of parts) {
+      if (part.includes('/')) {
+         const [range, stepStr] = part.split('/');
+         const step = parseInt(stepStr, 10);
+         let start = min;
+         let end = max;
+         if (range !== '*') {
+            if (range.includes('-')) {
+               const [s, e] = range.split('-');
+               start = parseInt(s, 10);
+               end = parseInt(e, 10);
+            } else {
+               start = parseInt(range, 10);
+            }
+         }
+         if (value >= start && value <= end && (value - start) % step === 0) {
+            return true;
+         }
+      } else if (part.includes('-')) {
+         const [s, e] = part.split('-');
+         const start = parseInt(s, 10);
+         const end = parseInt(e, 10);
+         if (value >= start && value <= end) return true;
+      } else {
+         if (parseInt(part, 10) === value) return true;
+      }
+   }
+   return false;
+};
+
+const getNextCronDate = (cronExpr, fromDate = new Date()) => {
+   const fields = cronExpr.trim().split(/\s+/);
+   if (fields.length !== 5) {
+      throw new Error('Invalid cron expression');
+   }
+   const [minExpr, hourExpr, domExpr, monthExpr, dowExpr] = fields;
+   let testDate = new Date(fromDate.getTime());
+   testDate.setSeconds(0);
+   testDate.setMilliseconds(0);
+   
+   const maxMinutes = 30 * 24 * 60; // 30 days
+   for (let i = 0; i < maxMinutes; i++) {
+      testDate.setMinutes(testDate.getMinutes() + 1);
+      
+      const min = testDate.getMinutes();
+      const hour = testDate.getHours();
+      const dom = testDate.getDate();
+      const month = testDate.getMonth() + 1;
+      const dow = testDate.getDay();
+      
+      const matchMin = matchCronField(minExpr, min, 0, 59);
+      const matchHour = matchCronField(hourExpr, hour, 0, 23);
+      const matchDom = matchCronField(domExpr, dom, 1, 31);
+      const matchMonth = matchCronField(monthExpr, month, 1, 12);
+      
+      let matchDow = false;
+      if (dowExpr === '*' || dowExpr === '?') {
+         matchDow = true;
+      } else {
+         matchDow = matchCronField(dowExpr, dow, 0, 7) || (dow === 0 && matchCronField(dowExpr, 7, 0, 7));
+      }
+      
+      if (matchMin && matchHour && matchDom && matchMonth && matchDow) {
+         return testDate;
+      }
+   }
+   return null;
+};
+
 // GET /api/status - Get current configuration status and latest logs meta
 app.get('/api/status', (req, res) => {
    const masterKey = process.env.MASTER_KEY;
@@ -114,6 +244,24 @@ app.get('/api/status', (req, res) => {
          // Ignore stats error
       }
    }
+
+   // Cron sync details
+   const cronSchedule = getCronSchedule();
+   const lastCronSync = getLastCronSync();
+   let nextCronSync = null;
+   try {
+      const nextDate = getNextCronDate(cronSchedule);
+      if (nextDate) {
+         nextCronSync = nextDate.toISOString();
+      }
+   } catch (e) {
+      console.error('Error calculating next cron date:', e);
+   }
+
+   status.cronSchedule = cronSchedule;
+   status.lastCronSync = lastCronSync.timestamp;
+   status.lastCronSyncLog = lastCronSync.log;
+   status.nextCronSync = nextCronSync;
 
    return res.json(status);
 });

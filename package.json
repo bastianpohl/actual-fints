@@ -14,7 +14,7 @@
   "scripts": {
     "setup": "node --env-file=.env setup.js",
     "debug": "node --env-file=.env main.js",
-    "start": "node --env-file=.env main.js",
+    "start": "node --env-file=.env cron-run.js",
     "test": "node --test",
     "debug-api": "node --env-file=.env rest-api.js",
     "start-api": "node --env-file=.env rest-api.js"
