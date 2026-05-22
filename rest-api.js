@@ -41,7 +41,11 @@ const restartServiceInBackground = () => {
 
    setImmediate(() => {
       console.log(`Restarting ${SERVICE_NAME} in background...`);
-      runCommand('sudo', ['systemctl', 'restart', SERVICE_NAME])
+      const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
+      const cmd = isRoot ? 'systemctl' : 'sudo';
+      const args = isRoot ? ['restart', SERVICE_NAME] : ['systemctl', 'restart', SERVICE_NAME];
+
+      runCommand(cmd, args)
          .then((result) => {
             if (result.code === 0) {
                console.log(`Restarted ${SERVICE_NAME}: ${result.stdout || 'ok'}`);
