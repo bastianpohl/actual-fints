@@ -394,6 +394,66 @@ app.post('/api/notifications/test', async (req, res) => {
    }
 });
 
+// GET /api/budget/accounts - Retrieve list of available Actual Budget accounts
+app.get('/api/budget/accounts', async (req, res) => {
+   const masterKey = process.env.MASTER_KEY;
+   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht gesetzt.' });
+
+   let store;
+   let url = '';
+   let syncDb = '';
+   let password = '';
+   try {
+      store = new CredentialsStore(masterKey);
+      url = store.getConfig('actual_server_url') || '';
+      syncDb = store.getConfig('actual_sync_db') || '';
+      password = store.getEncryptedConfig('actual_password') || '';
+
+      // Fallback to process.env variables if database entries are not yet populated
+      if (!url && !syncDb && !password) {
+         url = process.env.AB_URL || '';
+         syncDb = process.env.AB_SYNC_DB || '';
+         password = process.env.AB_PASS || '';
+      }
+   } catch (err) {
+      return res.status(500).json({ error: 'Fehler beim Laden der Budget-Konfiguration: ' + err.message });
+   } finally {
+      if (store) store.close();
+   }
+
+   if (!url || !syncDb || !password) {
+      return res.status(400).json({ error: 'Actual Budget ist nicht oder unvollständig konfiguriert.' });
+   }
+
+   const { BudgetClient } = require('./lib/budget-api');
+   const client = new BudgetClient({
+      serverUrl: url.trim(),
+      syncDb: syncDb.trim(),
+      password: password.trim(),
+   });
+
+   try {
+      await client.loadBudget();
+      const accounts = await client.getAccounts() || [];
+      // We only return open accounts that can hold transactions
+      const mapped = accounts.map(acc => ({
+         id: acc.id,
+         name: acc.name,
+         offbudget: acc.offbudget,
+         closed: acc.closed
+      }));
+      return res.json({ success: true, accounts: mapped });
+   } catch (err) {
+      return res.status(400).json({ error: 'Verbindung zu Actual Budget fehlgeschlagen: ' + err.message });
+   } finally {
+      try {
+         await client.close();
+      } catch (closeErr) {
+         console.error('Fehler beim Schließen des Budget-Clients:', closeErr);
+      }
+   }
+});
+
 // POST /api/budget/test - Test Actual Budget connection credentials
 app.post('/api/budget/test', async (req, res) => {
    const masterKey = process.env.MASTER_KEY;

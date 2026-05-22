@@ -446,15 +446,46 @@ document.addEventListener('DOMContentLoaded', () => {
             gitUpdateBtn.disabled = false;
          }, 5000);
       }
-   });
+   };
+
+   let actualAccounts = [];
+   const loadActualAccounts = async () => {
+      try {
+         const res = await fetch('/api/budget/accounts');
+         if (res.ok) {
+            const data = await res.json();
+            if (data.success && Array.isArray(data.accounts)) {
+               actualAccounts = data.accounts.filter(acc => !acc.closed);
+            }
+         }
+      } catch (err) {
+         console.error('Error fetching Actual Budget accounts:', err);
+      }
+   };
 
    // --- MODAL ACCOUNT ROWS BUILDER ---
    const addAccountRow = (iban = '', actualName = '') => {
       const row = document.createElement('div');
       row.className = 'account-input-row';
+      
+      let optionsHtml = '<option value="">-- Konto auswählen --</option>';
+      let foundSelected = false;
+      
+      actualAccounts.forEach(acc => {
+         const selected = acc.name === actualName ? 'selected' : '';
+         if (selected) foundSelected = true;
+         optionsHtml += `<option value="${escapeHtml(acc.name)}" ${selected}>${escapeHtml(acc.name)}</option>`;
+      });
+      
+      if (actualName && !foundSelected) {
+         optionsHtml += `<option value="${escapeHtml(actualName)}" selected>${escapeHtml(actualName)} (nicht in Actual gefunden)</option>`;
+      }
+
       row.innerHTML = `
          <input type="text" class="input-field modal-account-iban" required placeholder="DE12..." value="${iban}" style="font-family:var(--font-mono); font-size:0.85rem;">
-         <input type="text" class="input-field modal-account-actual-name" required placeholder="Actual Budget Kontoname" value="${actualName}">
+         <select class="input-field modal-account-actual-name" required style="font-size:0.85rem;">
+            ${optionsHtml}
+         </select>
          <button class="btn danger remove-account-row-btn" type="button" style="padding:0.6rem; font-size:0.9rem;">✕</button>
       `;
       modalAccountRowsContainer.appendChild(row);
@@ -467,7 +498,7 @@ document.addEventListener('DOMContentLoaded', () => {
    modalAddAccountRow.addEventListener('click', () => addAccountRow());
 
    // --- MODAL ACTIONS ---
-   const openAddModal = () => {
+   const openAddModal = async () => {
       modalTitle.textContent = 'Neue Bank hinzufügen';
       modalEditMode.value = '';
       
@@ -484,13 +515,16 @@ document.addEventListener('DOMContentLoaded', () => {
       inputPin.required = true;
       modalAccountRowsContainer.innerHTML = '';
       
+      // Load accounts in background or wait for them
+      await loadActualAccounts();
+      
       // Default to 1 empty mapping row
       addAccountRow();
 
       bankModal.classList.add('show');
    };
 
-   const openEditModal = (name) => {
+   const openEditModal = async (name) => {
       const bank = currentBanks.find(b => b.name === name);
       if (!bank) return;
 
@@ -510,6 +544,9 @@ document.addEventListener('DOMContentLoaded', () => {
       inputPin.value = '';
       inputPin.placeholder = '●●●●●●●● (Unverändert lassen)';
       inputPin.required = false;
+
+      // Load accounts
+      await loadActualAccounts();
 
       // Populate accounts
       modalAccountRowsContainer.innerHTML = '';
@@ -1111,6 +1148,7 @@ document.addEventListener('DOMContentLoaded', () => {
      loadBanks();
      loadNtfyTopic();
      loadAbConfig();
+     loadActualAccounts();
      applyTheme();
 
    // --- HELPERS ---
