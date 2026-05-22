@@ -66,8 +66,9 @@ app.get('/api/status', (req, res) => {
    let dbError = null;
 
    if (masterKey) {
-      const store = new CredentialsStore(masterKey);
+      let store;
       try {
+         store = new CredentialsStore(masterKey);
          const banks = store.listBanks() || [];
          bankCount = banks.length;
          accountCount = banks.reduce((sum, b) => sum + (b.accountCount || 0), 0);
@@ -80,7 +81,7 @@ app.get('/api/status', (req, res) => {
       } catch (err) {
          dbError = err.message;
       } finally {
-         store.close();
+         if (store) store.close();
       }
    }
 
@@ -118,8 +119,9 @@ app.get('/api/banks', (req, res) => {
    const masterKey = process.env.MASTER_KEY;
    if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht gesetzt.' });
 
-   const store = new CredentialsStore(masterKey);
+   let store;
    try {
+      store = new CredentialsStore(masterKey);
       const banks = store.getAllBanks();
       // Mask both PIN and Login/Username for security on display
       const safeBanks = banks.map(b => ({
@@ -135,7 +137,7 @@ app.get('/api/banks', (req, res) => {
    } catch (err) {
       return res.status(500).json({ error: err.message });
    } finally {
-      store.close();
+      if (store) store.close();
    }
 });
 
@@ -149,14 +151,15 @@ app.post('/api/banks', (req, res) => {
       return res.status(400).json({ error: 'Alle Felder (Name, URL, BLZ, Login, PIN) sind erforderlich.' });
    }
 
-   const store = new CredentialsStore(masterKey);
+   let store;
    try {
+      store = new CredentialsStore(masterKey);
       const bankId = store.addBank({ name, url, blz, login, pin, accounts });
       return res.json({ success: true, bankId });
    } catch (err) {
       return res.status(500).json({ error: err.message });
    } finally {
-      store.close();
+      if (store) store.close();
    }
 });
 
@@ -168,8 +171,9 @@ app.put('/api/banks/:name', (req, res) => {
    const { name } = req.params;
    const { url, blz, login, pin, accounts, name: newName } = req.body ?? {};
 
-   const store = new CredentialsStore(masterKey);
+   let store;
    try {
+      store = new CredentialsStore(masterKey);
       const updates = {};
       if (url) updates.url = url;
       if (blz) updates.blz = blz;
@@ -183,7 +187,7 @@ app.put('/api/banks/:name', (req, res) => {
    } catch (err) {
       return res.status(500).json({ error: err.message });
    } finally {
-      store.close();
+      if (store) store.close();
    }
 });
 
@@ -193,14 +197,15 @@ app.delete('/api/banks/:name', (req, res) => {
    if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht gesetzt.' });
 
    const { name } = req.params;
-   const store = new CredentialsStore(masterKey);
+   let store;
    try {
+      store = new CredentialsStore(masterKey);
       const deleted = store.removeBank(name);
       return res.json({ success: deleted });
    } catch (err) {
       return res.status(500).json({ error: err.message });
    } finally {
-      store.close();
+      if (store) store.close();
    }
 });
 
@@ -258,15 +263,16 @@ app.get('/api/notifications/config', (req, res) => {
    const masterKey = process.env.MASTER_KEY;
    if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht gesetzt.' });
 
-   const store = new CredentialsStore(masterKey);
+   let store;
    try {
+      store = new CredentialsStore(masterKey);
       const topic = store.getConfig('ntfy_topic') || '';
       const server = store.getConfig('ntfy_server') || 'https://ntfy.sh';
       return res.json({ topic, server });
    } catch (err) {
       return res.status(500).json({ error: err.message });
    } finally {
-      store.close();
+      if (store) store.close();
    }
 });
 
@@ -280,15 +286,16 @@ app.post('/api/notifications/config', (req, res) => {
       return res.status(400).json({ error: 'Topic und Server-URL sind erforderlich.' });
    }
 
-   const store = new CredentialsStore(masterKey);
+   let store;
    try {
+      store = new CredentialsStore(masterKey);
       store.setConfig('ntfy_topic', topic.trim());
       store.setConfig('ntfy_server', server.trim());
       return res.json({ success: true, topic: topic.trim(), server: server.trim() });
    } catch (err) {
       return res.status(500).json({ error: err.message });
    } finally {
-      store.close();
+      if (store) store.close();
    }
 });
 
@@ -297,8 +304,9 @@ app.get('/api/budget/config', (req, res) => {
    const masterKey = process.env.MASTER_KEY;
    if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht gesetzt.' });
 
-   const store = new CredentialsStore(masterKey);
+   let store;
    try {
+      store = new CredentialsStore(masterKey);
       let url = store.getConfig('actual_server_url') || '';
       let syncDb = store.getConfig('actual_sync_db') || '';
       let hasPassword = !!store.getEncryptedConfig('actual_password');
@@ -314,7 +322,7 @@ app.get('/api/budget/config', (req, res) => {
    } catch (err) {
       return res.status(500).json({ error: err.message });
    } finally {
-      store.close();
+      if (store) store.close();
    }
 });
 
@@ -328,8 +336,9 @@ app.post('/api/budget/config', (req, res) => {
       return res.status(400).json({ error: 'Server URL und Budget Sync ID sind erforderlich.' });
    }
 
-   const store = new CredentialsStore(masterKey);
+   let store;
    try {
+      store = new CredentialsStore(masterKey);
       store.setConfig('actual_server_url', url.trim());
       store.setConfig('actual_sync_db', syncDb.trim());
       if (password && password !== '●●●●●●●●') {
@@ -339,7 +348,7 @@ app.post('/api/budget/config', (req, res) => {
    } catch (err) {
       return res.status(500).json({ error: err.message });
    } finally {
-      store.close();
+      if (store) store.close();
    }
 });
 
@@ -348,16 +357,17 @@ app.post('/api/notifications/test', async (req, res) => {
    const masterKey = process.env.MASTER_KEY;
    if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht gesetzt.' });
 
-   const store = new CredentialsStore(masterKey);
+   let store;
    let topic = '';
    let server = 'https://ntfy.sh';
    try {
+      store = new CredentialsStore(masterKey);
       topic = store.getConfig('ntfy_topic');
       server = store.getConfig('ntfy_server') || 'https://ntfy.sh';
    } catch (err) {
       return res.status(500).json({ error: err.message });
    } finally {
-      store.close();
+      if (store) store.close();
    }
 
    if (!topic) {
@@ -456,8 +466,9 @@ app.put('/api/update/config', async (req, res) => {
 // Automatic migration of Actual Budget credentials from .env to SQLite if not already migrated
 const masterKey = process.env.MASTER_KEY;
 if (masterKey) {
-   const store = new CredentialsStore(masterKey);
+   let store;
    try {
+      store = new CredentialsStore(masterKey);
       const dbUrl = store.getConfig('actual_server_url');
       if (!dbUrl && process.env.AB_URL && process.env.AB_PASS && process.env.AB_SYNC_DB) {
          console.log('🔄 [Migration] Migriere Actual Budget Verbindungsdaten aus .env in die SQLite-Datenbank...');
@@ -472,7 +483,7 @@ if (masterKey) {
    } catch (err) {
       console.error('❌ [Migration] Fehler bei der automatischen Actual Budget Migration:', err.message);
    } finally {
-      store.close();
+      if (store) store.close();
    }
 }
 

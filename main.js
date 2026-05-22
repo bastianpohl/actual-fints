@@ -22,10 +22,11 @@ const main = async () => {
       return [];
    }
 
-   const store = new CredentialsStore(masterKey);
+   let store;
    let banks;
    let actualConfig = {};
    try {
+      store = new CredentialsStore(masterKey);
       // Automatic migration of Actual Budget credentials from .env to SQLite if not already migrated
       const dbUrl = store.getConfig('actual_server_url');
       if (!dbUrl && process.env.AB_URL && process.env.AB_PASS && process.env.AB_SYNC_DB) {
@@ -46,8 +47,10 @@ const main = async () => {
          syncDb: store.getConfig('actual_sync_db') || process.env.AB_SYNC_DB,
          dataDir: store.getConfig('actual_data_dir') || process.env.AB_PATH || './actual-budget/'
       };
+   } catch (err) {
+      console.error('Error opening credentials store or retrieving config:', err.message);
    } finally {
-      store.close();
+      if (store) store.close();
    }
 
    if (!banks || banks.length === 0) {
