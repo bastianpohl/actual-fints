@@ -97,8 +97,8 @@ const getLastCronSync = () => {
             lastTimestamp = lastMatch[1];
             
             const startIndex = lastMatch.index;
-            const nextSyncIndex = content.indexOf('--- SYNC START', startIndex + 1);
-            const nextCronIndex = content.indexOf('--- CRON SYNC START', startIndex + 1);
+            const nextSyncIndex = content.indexOf('--- SYNC START', startIndex + lastMatch[0].length);
+            const nextCronIndex = content.indexOf('--- CRON SYNC START', startIndex + lastMatch[0].length);
             let endIndex = content.length;
             
             if (nextSyncIndex !== -1 && nextCronIndex !== -1) {
