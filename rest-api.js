@@ -394,6 +394,104 @@ app.post('/api/notifications/test', async (req, res) => {
    }
 });
 
+// POST /api/budget/test - Test Actual Budget connection credentials
+app.post('/api/budget/test', async (req, res) => {
+   const masterKey = process.env.MASTER_KEY;
+   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht gesetzt.' });
+
+   let { url, syncDb, password } = req.body ?? {};
+   if (!url || !syncDb) {
+      return res.status(400).json({ error: 'Server URL und Budget Sync ID sind erforderlich.' });
+   }
+
+   let store;
+   try {
+      if (!password || password === '●●●●●●●●') {
+         store = new CredentialsStore(masterKey);
+         password = store.getEncryptedConfig('actual_password');
+      }
+   } catch (err) {
+      return res.status(500).json({ error: 'Fehler beim Laden des gespeicherten Passworts: ' + err.message });
+   } finally {
+      if (store) store.close();
+   }
+
+   if (!password) {
+      return res.status(400).json({ error: 'Passwort ist erforderlich.' });
+   }
+
+   const { BudgetClient } = require('./lib/budget-api');
+   const client = new BudgetClient({
+      serverUrl: url.trim(),
+      syncDb: syncDb.trim(),
+      password: password.trim(),
+   });
+
+   try {
+      await client.loadBudget();
+      return res.json({ success: true });
+   } catch (err) {
+      return res.status(400).json({ error: err.message });
+   } finally {
+      try {
+         await client.close();
+      } catch (closeErr) {
+         console.error('Fehler beim Schließen des Budget-Clients:', closeErr);
+      }
+   }
+});
+
+// POST /api/banks/test - Test bank FinTS connection credentials
+app.post('/api/banks/test', async (req, res) => {
+   const masterKey = process.env.MASTER_KEY;
+   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht gesetzt.' });
+
+   let { name, url, blz, login, pin } = req.body ?? {};
+
+   let store;
+   try {
+      if (name && (login === '●●●●●●●●' || pin === '●●●●●●●●' || !url || !blz)) {
+         store = new CredentialsStore(masterKey);
+         const existing = store.getBank(name);
+         if (existing) {
+            if (!url) url = existing.fints.url;
+            if (!blz) blz = existing.fints.blz;
+            if (login === '●●●●●●●●' || !login) login = existing.fints.login;
+            if (pin === '●●●●●●●●' || !pin) pin = existing.fints.pin;
+         }
+      }
+   } catch (err) {
+      return res.status(500).json({ error: 'Fehler beim Laden der gespeicherten Bankdaten: ' + err.message });
+   } finally {
+      if (store) store.close();
+   }
+
+   if (!url || !blz || !login || !pin) {
+      return res.status(400).json({ error: 'Alle Felder (URL, BLZ, Login, PIN) sind erforderlich.' });
+   }
+
+   const { FinTSClient } = require('./lib/fints-api');
+   try {
+      const client = new FinTSClient({
+         url: url.trim(),
+         blz: blz.trim(),
+         login: login.trim(),
+         pin: pin.trim()
+      });
+      await client.initiateClient();
+      await client.loadAccounts();
+      const accounts = client.getAccounts() || [];
+      const accountList = accounts.map(acc => ({
+         iban: acc.iban,
+         name: acc.name,
+         productName: acc.productName
+      }));
+      return res.json({ success: true, accounts: accountList });
+   } catch (err) {
+      return res.status(400).json({ error: err.message });
+   }
+});
+
 // ── Main Execution Endpoints ────────────────────────────────────────
 
 app.post('/api/transactions/load', (req, res) => {

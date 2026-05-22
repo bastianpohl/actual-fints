@@ -227,42 +227,13 @@
                   </div>
                </div>
 
-               <!-- Systemkonfiguration Card -->
-               <div class="glass-card" style="display:flex; flex-direction:column; justify-content:space-between; height: auto;">
-                  <div>
-                     <h2 style="font-size:1.2rem; font-weight:600; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
-                        <span class="material-icons" style="color: var(--accent-primary);">dns</span> Systemkonfiguration
-                     </h2>
-                     <div style="display:flex; flex-direction:column; gap:0.75rem; font-size:0.9rem;">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                           <span style="color: var(--text-secondary);">MASTER_KEY:</span>
-                           <span id="config-master-key" class="account-actual-name" style="color:var(--success); font-weight:500;">Gefunden</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                           <span style="color: var(--text-secondary);">Actual Server URL:</span>
-                           <span id="config-ab-url" style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size:0.8rem;">-</span>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                           <span style="color: var(--text-secondary);">Budget Sync ID:</span>
-                           <span id="config-ab-sync" style="font-family: var(--font-mono); font-size:0.8rem;">-</span>
-                        </div>
-                     </div>
-                  </div>
-                  
-                  <button class="btn secondary" id="git-update-btn" style="margin-top:1.5rem; width: 100%;">
-                     <span class="material-icons btn-icon">sync</span> Git Pull & API Update
-                  </button>
-               </div>
-
-            </div>
-
-            <!-- Right Column: Budget & Push settings -->
-            <div style="display:flex; flex-direction:column; gap:1.5rem;">
-
-               <!-- Actual Budget Verbindung Settings Card -->
+               <!-- System- & Verbindungskonfiguration Settings Card -->
                <div class="glass-card">
-                  <h2 style="font-size:1.2rem; font-weight:600; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
-                     <span class="material-icons" style="color: var(--accent-primary);">account_balance_wallet</span> Actual Budget Verbindung
+                  <h2 style="font-size:1.2rem; font-weight:600; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem; justify-content:space-between;">
+                     <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <span class="material-icons" style="color: var(--accent-primary);">settings_suggest</span> System- & Verbindungskonfiguration
+                     </div>
+                     <span id="config-master-key" class="account-actual-name" style="color:var(--success); font-weight:500; font-size:0.75rem; background:rgba(16, 185, 129, 0.1); padding: 0.25rem 0.5rem; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.25);">Gefunden</span>
                   </h2>
                   
                   <!-- 1. READ-ONLY VIEW (Default) -->
@@ -285,13 +256,19 @@
                            <span id="ab-pass-status" style="font-size:0.85rem; color: var(--text-primary);">-</span>
                         </div>
                      </div>
-                     <div style="display:flex; gap:0.5rem; margin-top:1.25rem; width:100%;">
-                        <button class="btn secondary" id="btn-ab-switch-to-edit" style="flex:1;">
-                           <span class="material-icons btn-icon">edit</span> Editieren
+                     
+                     <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:1.25rem;">
+                        <div style="display:flex; gap:0.5rem; width:100%;">
+                           <button class="btn secondary" id="btn-ab-switch-to-edit" style="flex:1; display:flex; justify-content:center; align-items:center; gap:0.35rem;">
+                              <span class="material-icons" style="font-size:1.15rem;">edit</span> Editieren
+                           </button>
+                        </div>
+                        <button class="btn secondary" id="git-update-btn" style="width: 100%; display:flex; justify-content:center; align-items:center; gap:0.5rem; margin-top:0.25rem;">
+                           <span class="material-icons btn-icon" id="git-update-icon">sync</span> Update & Git Pull
                         </button>
                      </div>
                   </div>
-
+ 
                   <!-- 2. EDIT VIEW (Hidden by default) -->
                   <div id="ab-edit-view" style="display:none; flex-direction:column; gap:0.75rem; font-size:0.9rem;">
                      <div class="form-group" style="margin-bottom:0.25rem;">
@@ -309,14 +286,25 @@
                         </label>
                         <input type="password" id="ab-pass-input" class="input-field" style="font-size:0.85rem; padding:0.4rem 0.6rem; height:36px; margin-top:0.25rem;" placeholder="Unverändert lassen oder neues Passwort eingeben">
                      </div>
-                     <div style="display:flex; gap:0.5rem; margin-top:1.25rem;">
-                        <button class="btn secondary" id="btn-ab-cancel-edit" style="flex:1;">Abbrechen</button>
-                        <button class="btn" id="save-ab-btn" style="flex:1;">
-                           <span class="material-icons btn-icon">save</span> Speichern
+                     
+                     <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:1.25rem;">
+                        <button class="btn warning" id="test-ab-btn" style="width:100%; display:flex; justify-content:center; align-items:center; gap:0.5rem;">
+                           <span class="material-icons" style="font-size:1.15rem;" id="test-ab-icon">sync_alt</span> Verbindung testen
                         </button>
+                        <div style="display:flex; gap:0.5rem; width:100%;">
+                           <button class="btn secondary" id="btn-ab-cancel-edit" style="flex:1;">Abbrechen</button>
+                           <button class="btn" id="save-ab-btn" style="flex:1; display:flex; justify-content:center; align-items:center; gap:0.35rem;">
+                              <span class="material-icons" style="font-size:1.15rem;">save</span> Speichern
+                           </button>
+                        </div>
                      </div>
                   </div>
                </div>
+
+            </div>
+
+            <!-- Right Column: Budget & Push settings -->
+            <div style="display:flex; flex-direction:column; gap:1.5rem;">
 
                <!-- Push-Benachrichtigungen Box -->
                <div class="glass-card" style="display:flex; flex-direction:column; justify-content:space-between; height: auto;">
@@ -446,9 +434,14 @@
                   </div>
                </div>
 
-               <div class="modal-actions">
-                  <button class="btn secondary" type="button" id="modal-cancel-btn">Abbrechen</button>
-                  <button class="btn" type="submit" id="modal-submit-btn">Speichern</button>
+               <div class="modal-actions" style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:0.5rem; flex-wrap:wrap;">
+                  <button class="btn secondary warning-border" type="button" id="modal-test-btn" style="border-color: var(--warning); color: var(--warning); background: transparent; display:flex; align-items:center; gap:0.35rem; margin-right:auto;">
+                     <span class="material-icons" style="font-size:1.15rem;" id="modal-test-icon">sync_alt</span> Verbindung testen
+                  </button>
+                  <div style="display:flex; gap:0.5rem;">
+                     <button class="btn secondary" type="button" id="modal-cancel-btn">Abbrechen</button>
+                     <button class="btn" type="submit" id="modal-submit-btn">Speichern</button>
+                  </div>
                </div>
             </form>
          </div>

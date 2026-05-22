@@ -30,8 +30,6 @@ document.addEventListener('DOMContentLoaded', () => {
    const statusSyncCircle = document.getElementById('status-sync-circle');
 
    const configMasterKey = document.getElementById('config-master-key');
-   const configAbUrl = document.getElementById('config-ab-url');
-   const configAbSync = document.getElementById('config-ab-sync');
 
    // Bank Page
    const bankCardsContainer = document.getElementById('bank-cards-container');
@@ -598,6 +596,63 @@ document.addEventListener('DOMContentLoaded', () => {
       }
    });
 
+   const modalTestBtn = document.getElementById('modal-test-btn');
+   if (modalTestBtn) {
+      modalTestBtn.addEventListener('click', async (e) => {
+         e.preventDefault();
+
+         const editModeName = modalEditMode.value;
+         const url = inputUrl.value.trim();
+         const blz = inputBlz.value.trim();
+         const login = inputLogin.value.trim() || '●●●●●●●●';
+         const pin = inputPin.value || '●●●●●●●●';
+
+         if (!url || !blz) {
+            showToast('URL und BLZ sind erforderlich zum Testen.', 'error');
+            return;
+         }
+
+         try {
+            modalTestBtn.disabled = true;
+            modalTestBtn.innerHTML = '<span class="material-icons spinning-icon" id="modal-test-icon">sync</span> Teste...';
+
+            const res = await fetch('/api/banks/test', {
+               method: 'POST',
+               headers: {
+                  'Content-Type': 'application/json'
+               },
+               body: JSON.stringify({
+                  name: editModeName,
+                  url,
+                  blz,
+                  login,
+                  pin
+               })
+            });
+
+            const data = await res.json();
+
+            if (res.ok && data.success) {
+               const accountCount = data.accounts ? data.accounts.length : 0;
+               let successMsg = `Erfolgreich mit Bank verbunden! ${accountCount} Konten gefunden.`;
+               if (accountCount > 0) {
+                  const ibans = data.accounts.map(acc => maskIban(acc.iban)).join(', ');
+                  successMsg += ` (IBANs: ${ibans})`;
+               }
+               showToast(successMsg, 'success');
+            } else {
+               showToast(data.error || 'Verbindung zum FinTS-Server fehlgeschlagen.', 'error');
+            }
+         } catch (err) {
+            console.error('Error testing bank connection:', err);
+            showToast('Netzwerk- oder Serverfehler beim Verbindungstest.', 'error');
+         } finally {
+            modalTestBtn.disabled = false;
+            modalTestBtn.innerHTML = '<span class="material-icons" style="font-size:1.15rem;" id="modal-test-icon">sync_alt</span> Verbindung testen';
+         }
+      });
+   }
+
     // --- REFRESH LOGS BUTTONS ---
     refreshLogsBtn.addEventListener('click', loadLogs);
     clearLogsUiBtn.addEventListener('click', () => {
@@ -812,9 +867,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (abUrlInput) abUrlInput.value = lastSavedAbUrl;
             if (abSyncInput) abSyncInput.value = lastSavedAbSync;
             if (abPassInput) abPassInput.value = lastSavedAbHasPassword ? '●●●●●●●●' : '';
-
-            if (configAbUrl) configAbUrl.textContent = lastSavedAbUrl || 'Nicht konfiguriert';
-            if (configAbSync) configAbSync.textContent = lastSavedAbSync || 'Nicht konfiguriert';
          }
       } catch (err) {
          console.error('Error fetching ab config:', err);
@@ -913,9 +965,6 @@ document.addEventListener('DOMContentLoaded', () => {
                if (abSyncDisplay) abSyncDisplay.textContent = syncDb;
                if (abPassStatus) abPassStatus.textContent = (password || lastSavedAbHasPassword) ? '●●●●●●●● (Konfiguriert)' : 'Nicht konfiguriert';
 
-               if (configAbUrl) configAbUrl.textContent = url;
-               if (configAbSync) configAbSync.textContent = syncDb;
-
                if (abPassInput) abPassInput.type = 'password';
                if (btnAbShowPass) btnAbShowPass.textContent = 'Anzeigen';
 
@@ -938,7 +987,53 @@ document.addEventListener('DOMContentLoaded', () => {
             saveAbBtn.innerHTML = '<span class="material-icons btn-icon">save</span> Speichern';
          }
       });
-   }
+    }
+
+    const testAbBtn = document.getElementById('test-ab-btn');
+    if (testAbBtn) {
+       testAbBtn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          const abUrlInput = document.getElementById('ab-url-input');
+          const abSyncInput = document.getElementById('ab-sync-input');
+          const abPassInput = document.getElementById('ab-pass-input');
+
+          const url = abUrlInput ? abUrlInput.value.trim() : '';
+          const syncDb = abSyncInput ? abSyncInput.value.trim() : '';
+          const password = abPassInput ? abPassInput.value.trim() : '';
+
+          if (!url || !syncDb) {
+             showToast('Server-URL und Budget Sync ID sind erforderlich zum Testen.', 'error');
+             return;
+          }
+
+          try {
+             testAbBtn.disabled = true;
+             testAbBtn.innerHTML = '<span class="material-icons btn-icon spinning-icon" id="test-ab-icon">sync</span> Verbinde...';
+
+             const res = await fetch('/api/budget/test', {
+                method: 'POST',
+                headers: {
+                   'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ url, syncDb, password })
+             });
+
+             const data = await res.json();
+
+             if (res.ok && data.success) {
+                showToast('Verbindung zu Actual Budget erfolgreich hergestellt! 🎉', 'success');
+             } else {
+                showToast(data.error || 'Verbindung zu Actual Budget fehlgeschlagen.', 'error');
+             }
+          } catch (err) {
+             console.error('Error testing ab connection:', err);
+             showToast('Netzwerk- oder Serverfehler beim Verbindungstest.', 'error');
+          } finally {
+             testAbBtn.disabled = false;
+             testAbBtn.innerHTML = '<span class="material-icons" style="font-size:1.15rem;" id="test-ab-icon">sync_alt</span> Verbindung testen';
+          }
+       });
+    }
 
      // --- THEME MANAGEMENT ---
      const applyTheme = () => {

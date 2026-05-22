@@ -461,6 +461,16 @@ header {
    box-shadow: 0 4px 15px var(--glow-danger);
 }
 
+.btn.warning {
+   background: var(--warning);
+   color: #fff;
+}
+
+.btn.warning:hover {
+   opacity: 0.9;
+   box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+}
+
 .btn:disabled {
    background: var(--text-muted);
    cursor: not-allowed;
