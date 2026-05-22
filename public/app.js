@@ -1229,13 +1229,383 @@ document.addEventListener('DOMContentLoaded', () => {
          });
       }
 
-     // --- INITIALIZATION ---
-     loadStatus();
-     loadBanks();
-     loadNtfyTopic();
-     loadAbConfig();
-     loadActualAccounts();
-     applyTheme();
+      // --- SERVICE WORKER REGISTRATION ---
+      if ('serviceWorker' in navigator) {
+         window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/service-worker.js')
+               .then(reg => console.log('Service Worker registered successfully:', reg.scope))
+               .catch(err => console.error('Service Worker registration failed:', err));
+         });
+      }
+
+      // --- SECURITY & LOCK SCREEN SELECTORS ---
+      const lockScreen = document.getElementById('lock-screen');
+      const lockTitle = document.getElementById('lock-title');
+      const lockDesc = document.getElementById('lock-desc');
+      const lockSetupContainer = document.getElementById('lock-setup-container');
+      const lockDeviceName = document.getElementById('lock-device-name');
+      const lockRegisterBtn = document.getElementById('lock-register-btn');
+      const lockLoginBtn = document.getElementById('lock-login-btn');
+
+      const settingsDeviceName = document.getElementById('settings-device-name');
+      const btnAddPasskey = document.getElementById('btn-add-passkey');
+      const btnAuthLogout = document.getElementById('btn-auth-logout');
+
+      // --- SECURITY HELPERS ---
+      function base64urlToArrayBuffer(base64url) {
+         let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+         while (base64.length % 4) {
+            base64 += '=';
+         }
+         const raw = window.atob(base64);
+         const buffer = new ArrayBuffer(raw.length);
+         const view = new Uint8Array(buffer);
+         for (let i = 0; i < raw.length; i++) {
+            view[i] = raw.charCodeAt(i);
+         }
+         return buffer;
+      }
+
+      function arrayBufferToBase64url(buffer) {
+         const view = new Uint8Array(buffer);
+         let binary = '';
+         for (let i = 0; i < view.byteLength; i++) {
+            binary += String.fromCharCode(view[i]);
+         }
+         const base64 = window.btoa(binary);
+         return base64.replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+      }
+
+      // --- AUTHENTICATION FLOWS ---
+      async function checkAuthStatus() {
+         try {
+            const res = await fetch('/api/auth/status');
+            const data = await res.json();
+            
+            if (!data.configured) {
+               // Setup Mode (First time)
+               if (lockScreen) {
+                  lockScreen.style.display = 'flex';
+                  lockScreen.style.opacity = '1';
+               }
+               if (lockTitle) lockTitle.textContent = 'Passkey-Schutz einrichten';
+               if (lockDesc) lockDesc.textContent = 'Erstelle deinen ersten Passkey, um den Actual-FinTS Connector abzusichern.';
+               if (lockSetupContainer) lockSetupContainer.style.display = 'flex';
+               if (lockLoginBtn) lockLoginBtn.style.display = 'none';
+            } else if (!data.authenticated) {
+               // Locked Mode
+               if (lockScreen) {
+                  lockScreen.style.display = 'flex';
+                  lockScreen.style.opacity = '1';
+               }
+               if (lockTitle) lockTitle.textContent = 'Bereich gesperrt';
+               if (lockDesc) lockDesc.textContent = 'Bitte authentifiziere dich per Passkey, um auf den FinTS Connector zuzugreifen.';
+               if (lockSetupContainer) lockSetupContainer.style.display = 'none';
+               if (lockLoginBtn) lockLoginBtn.style.display = 'flex';
+               
+               // Automatically trigger TouchID/FaceID scanner on lockscreen display
+               handlePasskeyLogin();
+            } else {
+               // Unlocked Mode
+               if (lockScreen) {
+                  lockScreen.style.opacity = '0';
+                  setTimeout(() => {
+                     lockScreen.style.display = 'none';
+                  }, 400);
+               }
+               
+               // Run all normal app loaders
+               initAppData();
+            }
+         } catch (err) {
+            console.error('Auth status check failed:', err);
+            showToast('Authentifizierungs-Status konnte nicht geladen werden.', 'error');
+         }
+      }
+
+      async function handlePasskeyLogin() {
+         try {
+            const resOptions = await fetch('/api/auth/login-challenge', { method: 'POST' });
+            if (!resOptions.ok) {
+               const errData = await resOptions.json();
+               throw new Error(errData.error || 'Challenge-Abruf fehlgeschlagen');
+            }
+            
+            const { options, challengeId } = await resOptions.json();
+            
+            options.challenge = base64urlToArrayBuffer(options.challenge);
+            if (options.allowCredentials) {
+               for (const cred of options.allowCredentials) {
+                  cred.id = base64urlToArrayBuffer(cred.id);
+               }
+            }
+            
+            const credential = await navigator.credentials.get({
+               publicKey: options
+            });
+            
+            if (!credential) {
+               throw new Error('Authentifizierung abgebrochen.');
+            }
+            
+            const body = {
+               id: credential.id,
+               rawId: arrayBufferToBase64url(credential.rawId),
+               type: credential.type,
+               response: {
+                  authenticatorData: arrayBufferToBase64url(credential.response.authenticatorData),
+                  clientDataJSON: arrayBufferToBase64url(credential.response.clientDataJSON),
+                  signature: arrayBufferToBase64url(credential.response.signature),
+                  userHandle: credential.response.userHandle ? arrayBufferToBase64url(credential.response.userHandle) : null,
+               }
+            };
+            
+            const resVerify = await fetch('/api/auth/login-verify', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ body, challengeId })
+            });
+            
+            if (!resVerify.ok) {
+               const errData = await resVerify.json();
+               throw new Error(errData.error || 'Verifizierung fehlgeschlagen');
+            }
+            
+            const verifyResult = await resVerify.json();
+            if (verifyResult.verified) {
+               showToast('Erfolgreich entsperrt!', 'success');
+               if (lockScreen) {
+                  lockScreen.style.opacity = '0';
+                  setTimeout(() => {
+                     lockScreen.style.display = 'none';
+                  }, 400);
+               }
+               
+               initAppData();
+            } else {
+               throw new Error('Verifizierung fehlgeschlagen.');
+            }
+         } catch (err) {
+            console.error('Passkey login error:', err);
+            showToast(err.message, 'error');
+         }
+      }
+
+      async function handlePasskeyRegistration(deviceNameVal, isFromSettings = false) {
+         try {
+            const deviceName = deviceNameVal.trim() || (isFromSettings ? 'Neues Gerät' : 'Hauptgerät');
+            
+            const resOptions = await fetch('/api/auth/register-challenge', { method: 'POST' });
+            if (!resOptions.ok) {
+               const errData = await resOptions.json();
+               throw new Error(errData.error || 'Challenge-Abruf fehlgeschlagen');
+            }
+            
+            const { options, challengeId } = await resOptions.json();
+            
+            options.challenge = base64urlToArrayBuffer(options.challenge);
+            options.user.id = base64urlToArrayBuffer(options.user.id);
+            if (options.excludeCredentials) {
+               for (const cred of options.excludeCredentials) {
+                  cred.id = base64urlToArrayBuffer(cred.id);
+               }
+            }
+            
+            const credential = await navigator.credentials.create({
+               publicKey: options
+            });
+            
+            if (!credential) {
+               throw new Error('Registrierung abgebrochen.');
+            }
+            
+            const body = {
+               id: credential.id,
+               rawId: arrayBufferToBase64url(credential.rawId),
+               type: credential.type,
+               response: {
+                  clientDataJSON: arrayBufferToBase64url(credential.response.clientDataJSON),
+                  attestationObject: arrayBufferToBase64url(credential.response.attestationObject),
+                  transports: credential.getResponse ? credential.getResponse().transports : []
+               }
+            };
+            
+            const resVerify = await fetch('/api/auth/register-verify', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ body, challengeId, deviceName })
+            });
+            
+            if (!resVerify.ok) {
+               const errData = await resVerify.json();
+               throw new Error(errData.error || 'Verifizierung fehlgeschlagen');
+            }
+            
+            const verifyResult = await resVerify.json();
+            if (verifyResult.verified) {
+               showToast('Passkey erfolgreich eingerichtet!', 'success');
+               if (!isFromSettings) {
+                  if (lockScreen) {
+                     lockScreen.style.opacity = '0';
+                     setTimeout(() => {
+                        lockScreen.style.display = 'none';
+                     }, 400);
+                  }
+                  initAppData();
+               } else {
+                  if (settingsDeviceName) settingsDeviceName.value = '';
+                  loadDevices();
+               }
+            } else {
+               throw new Error('Registrierungs-Verifizierung fehlgeschlagen.');
+            }
+         } catch (err) {
+            console.error('Passkey registration error:', err);
+            showToast(err.message, 'error');
+         }
+      }
+
+      async function loadDevices() {
+         try {
+            const settingsAuthStatus = document.getElementById('settings-auth-status');
+            const resStatus = await fetch('/api/auth/status');
+            const statusData = await resStatus.json();
+            
+            if (settingsAuthStatus) {
+               if (statusData.configured) {
+                  settingsAuthStatus.textContent = 'Aktiviert';
+                  settingsAuthStatus.style.color = 'var(--success)';
+                  settingsAuthStatus.style.background = 'rgba(16, 185, 129, 0.1)';
+                  settingsAuthStatus.style.border = '1px solid rgba(16, 185, 129, 0.25)';
+               } else {
+                  settingsAuthStatus.textContent = 'Deaktiviert';
+                  settingsAuthStatus.style.color = 'var(--text-muted)';
+                  settingsAuthStatus.style.background = 'rgba(255, 255, 255, 0.05)';
+                  settingsAuthStatus.style.border = '1px solid rgba(255, 255, 255, 0.08)';
+               }
+            }
+            
+            const res = await fetch('/api/auth/devices');
+            if (!res.ok) return;
+            
+            const devices = await res.json();
+            const container = document.getElementById('passkey-devices-container');
+            if (!container) return;
+            
+            if (devices.length === 0) {
+               container.innerHTML = `
+                  <div style="font-size:0.8rem; color:var(--text-muted); font-style:italic; text-align:center; padding: 0.5rem 0; border: 1px dashed var(--display-border); border-radius: 8px;">
+                     Keine Geräte registriert
+                  </div>
+               `;
+               return;
+            }
+            
+            container.innerHTML = devices.map(dev => {
+               const dateStr = new Date(dev.createdAt).toLocaleDateString('de-DE', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+               });
+               
+               return `
+                  <div style="display:flex; justify-content:space-between; align-items:center; background:var(--display-bg); border:1px solid var(--display-border); padding:0.5rem 0.75rem; border-radius:8px; gap:0.5rem;">
+                     <div style="display:flex; flex-direction:column; gap:0.15rem; min-width:0; text-align:left;">
+                        <span style="font-size:0.85rem; font-weight:500; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${escapeHtml(dev.deviceName)}</span>
+                        <span style="font-size:0.7rem; color:var(--text-muted);">${dateStr}</span>
+                     </div>
+                     <button class="btn secondary btn-delete-device" data-id="${dev.credentialID}" style="padding:0; width:28px; height:28px; display:flex; align-items:center; justify-content:center; flex-shrink:0; color:var(--danger); border-color:rgba(239, 68, 68, 0.2); background:transparent;" title="Gerät löschen">
+                        <span class="material-icons" style="font-size:1rem;">delete</span>
+                     </button>
+                  </div>
+               `;
+            }).join('');
+            
+            container.querySelectorAll('.btn-delete-device').forEach(btn => {
+               btn.addEventListener('click', async () => {
+                  const id = btn.getAttribute('data-id');
+                  if (confirm('Möchtest du dieses Gerät wirklich entfernen? Wenn dies dein letztes Gerät ist, wird der Passkey-Schutz deaktiviert.')) {
+                     try {
+                        const delRes = await fetch(`/api/auth/devices/${id}`, { method: 'DELETE' });
+                        if (delRes.ok) {
+                           showToast('Gerät erfolgreich entfernt.', 'success');
+                           loadDevices();
+                        } else {
+                           const errData = await delRes.json();
+                           showToast(errData.error || 'Fehler beim Löschen.', 'error');
+                        }
+                     } catch (e) {
+                        showToast('Netzwerkfehler beim Löschen.', 'error');
+                     }
+                  }
+               });
+            });
+         } catch (err) {
+            console.error('Failed to load passkey devices:', err);
+         }
+      }
+
+      async function handleLogout() {
+         try {
+            const res = await fetch('/api/auth/logout', { method: 'POST' });
+            if (res.ok) {
+               showToast('Erfolgreich abgemeldet.', 'success');
+               checkAuthStatus();
+            }
+         } catch (err) {
+            showToast('Abmeldung fehlgeschlagen.', 'error');
+         }
+      }
+
+      function initAppData() {
+         loadStatus();
+         loadBanks();
+         loadNtfyTopic();
+         loadAbConfig();
+         loadActualAccounts();
+         loadDevices();
+      }
+
+      // --- WIRE EVENT LISTENERS ---
+      if (lockRegisterBtn) {
+         lockRegisterBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const devName = lockDeviceName ? lockDeviceName.value : '';
+            handlePasskeyRegistration(devName, false);
+         });
+      }
+
+      if (lockLoginBtn) {
+         lockLoginBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            handlePasskeyLogin();
+         });
+      }
+
+      if (btnAddPasskey) {
+         btnAddPasskey.addEventListener('click', (e) => {
+            e.preventDefault();
+            const devName = settingsDeviceName ? settingsDeviceName.value : '';
+            if (!devName.trim()) {
+               showToast('Bitte einen Gerätenamen eingeben.', 'error');
+               return;
+            }
+            handlePasskeyRegistration(devName, true);
+         });
+      }
+
+      if (btnAuthLogout) {
+         btnAuthLogout.addEventListener('click', (e) => {
+            e.preventDefault();
+            handleLogout();
+         });
+      }
+
+      // --- INITIALIZATION ---
+      applyTheme();
+      checkAuthStatus();
 
    // --- HELPERS ---
    function maskIban(iban) {

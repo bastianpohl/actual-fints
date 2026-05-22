@@ -7,6 +7,13 @@
    <link rel="stylesheet" href="style.css">
    <!-- Google Material Icons -->
    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+   
+   <!-- PWA Support -->
+   <link rel="manifest" href="/manifest.json">
+   <meta name="apple-mobile-web-app-capable" content="yes">
+   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+   <meta name="apple-mobile-web-app-title" content="Actual-FinTS">
+   <link rel="apple-touch-icon" href="/icon-192.png">
 </head>
 <body>
    <script>
@@ -19,6 +26,37 @@
          }
       })();
    </script>
+
+   <!-- Glassmorphism Fullscreen Lock Screen Overlay -->
+   <div id="lock-screen" style="display: flex; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: radial-gradient(circle at center, #0c2b30 0%, #041214 100%); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); transition: opacity 0.4s ease, visibility 0.4s ease;">
+      <div class="glass-card" style="max-width: 400px; width: 90%; text-align: center; padding: 2.5rem 2.0rem; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 25px 60px rgba(0, 0, 0, 0.65); display: flex; flex-direction: column; align-items: center; gap: 1.5rem; border-radius: 16px;">
+         <div style="background: var(--brand-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: flex; align-items: center; justify-content: center; width: 80px; height: 80px; border-radius: 50%; border: 2px solid rgba(15, 58, 64, 0.5); box-shadow: 0 0 20px rgba(0, 242, 254, 0.15);">
+            <span class="material-icons" style="font-size: 3.5rem; background: var(--brand-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;" id="lock-screen-icon">fingerprint</span>
+         </div>
+         <div style="display: flex; flex-direction: column; gap: 0.5rem; text-align: center;">
+            <h2 style="font-size: 1.5rem; font-weight: 600; color: var(--text-primary); margin: 0;" id="lock-title">Bereich gesperrt</h2>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0; line-height: 1.4;" id="lock-desc">Bitte authentifiziere dich per Passkey, um auf den FinTS Connector zuzugreifen.</p>
+         </div>
+         
+         <!-- First time Setup: Registration input form (hidden by default) -->
+         <div id="lock-setup-container" style="display: none; flex-direction: column; gap: 0.75rem; width: 100%;">
+            <input type="text" id="lock-device-name" class="input-field" placeholder="Gerätename (z.B. iPhone Admin)" style="text-align: center; height: 38px; font-size: 0.9rem;">
+            <button class="btn" id="lock-register-btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; height: 38px;">
+               <span class="material-icons" style="font-size: 1.15rem;">vpn_key</span> Passkey erstellen
+            </button>
+         </div>
+
+         <!-- Regular Login Button -->
+         <button class="btn" id="lock-login-btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; height: 38px;">
+            <span class="material-icons" style="font-size: 1.15rem;">fingerprint</span> Mit Passkey entsperren
+         </button>
+         
+         <div style="font-size: 0.75rem; color: var(--text-muted);" id="lock-footer">
+            Kryptografischer, passwortloser Schutz (WebAuthn)
+         </div>
+      </div>
+   </div>
+
    <div class="app-container">
       
       <!-- Brand Header -->
@@ -336,6 +374,44 @@
 
             <!-- Right Column: Budget & Push settings -->
             <div style="display:flex; flex-direction:column; gap:1.5rem;">
+
+                <!-- Passkey & Security Settings Card -->
+                <div class="glass-card">
+                   <h2 style="font-size:1.2rem; font-weight:600; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem; justify-content:space-between;">
+                      <div style="display:flex; align-items:center; gap:0.5rem;">
+                         <span class="material-icons" style="color: var(--accent-primary);">security</span> Zugangs-Sicherheit
+                      </div>
+                      <span id="settings-auth-status" class="account-actual-name" style="color:var(--text-muted); font-weight:500; font-size:0.75rem; background:rgba(255, 255, 255, 0.05); padding: 0.25rem 0.5rem; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.08);">Deaktiviert</span>
+                   </h2>
+                   
+                   <p style="color: var(--text-secondary); font-size:0.8rem; margin-bottom:1.25rem; line-height:1.4;">
+                      Schütze deine Actual Budget Zugangsdaten und Bank-PINs mit moderner Passkey-Authentifizierung (WebAuthn).
+                   </p>
+                   
+                   <div style="display:flex; flex-direction:column; gap:0.75rem; font-size:0.9rem;">
+                      <!-- List of registered devices -->
+                      <div class="form-group" style="margin-bottom:0.25rem;">
+                         <span style="font-size:0.75rem; color: var(--text-secondary); display:block; margin-bottom:0.5rem;">Registrierte Geräte / Keys</span>
+                         <div id="passkey-devices-container" style="display:flex; flex-direction:column; gap:0.5rem;">
+                            <div style="font-size:0.8rem; color:var(--text-muted); font-style:italic; text-align:center; padding: 0.5rem 0; border: 1px dashed var(--display-border); border-radius: 8px;">
+                               Keine Geräte registriert
+                            </div>
+                         </div>
+                      </div>
+
+                      <!-- Actions -->
+                      <div style="display:flex; gap:0.5rem; margin-top:0.5rem; align-items:center;">
+                         <input type="text" id="settings-device-name" class="input-field" placeholder="Gerätename (z.B. iPhone)" style="font-size:0.85rem; padding:0.4rem 0.6rem; height:36px; flex:1;">
+                         <button class="btn" id="btn-add-passkey" style="height:36px; font-size:0.85rem; padding:0 0.75rem; display:flex; align-items:center; gap:0.25rem; width:auto; flex-shrink:0;">
+                            <span class="material-icons" style="font-size:1.1rem;">add</span> Hinzufügen
+                         </button>
+                      </div>
+                      
+                      <button class="btn secondary warning-border" id="btn-auth-logout" style="border-color: var(--warning); color: var(--warning); background: transparent; display:flex; align-items:center; justify-content:center; gap:0.35rem; width:100%; margin-top:0.5rem;">
+                         <span class="material-icons" style="font-size:1.15rem;">logout</span> Abmelden / Sperren
+                      </button>
+                   </div>
+                </div>
 
                <!-- Push-Benachrichtigungen Box -->
                <div class="glass-card" style="display:flex; flex-direction:column; justify-content:space-between; height: auto;">

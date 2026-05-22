@@ -17,10 +17,12 @@
     "start": "node --env-file=.env cron-run.js",
     "test": "node --test",
     "debug-api": "node --env-file=.env rest-api.js",
-    "start-api": "node --env-file=.env rest-api.js"
+    "start-api": "node --env-file=.env rest-api.js",
+    "reset-auth": "node reset-auth.js"
   },
   "dependencies": {
     "@actual-app/api": "latest",
+    "@simplewebauthn/server": "13.3.0",
     "express": "^5.2.1",
     "fints": "^0.5.0",
     "winston": "^3.19.0"
