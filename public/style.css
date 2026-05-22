@@ -2,15 +2,24 @@
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap');
 
 :root {
-   --bg-primary: #08060D;
-   --bg-secondary: #120E1E;
-   --card-bg: rgba(22, 17, 36, 0.65);
-   --card-border: rgba(255, 255, 255, 0.07);
-   --card-border-hover: rgba(168, 85, 247, 0.25);
+   /* Base Palette & Layout */
+   --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+   --font-mono: 'Fira Code', monospace;
    
-   --accent-primary: #A855F7;       /* Electric Violet */
-   --accent-primary-hover: #9333EA;
+   --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+   --transition-normal: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+
+   /* ── DARK THEME (Default) ────────────────────────────────────────── */
+   --bg-primary: #07090e;
+   --bg-secondary: #0d111a;
+   --card-bg: rgba(15, 22, 36, 0.65);
+   --card-border: rgba(255, 255, 255, 0.07);
+   
+   /* Petrol Accent Palette */
+   --accent-primary: #0A7382;       /* Premium Darkened Petrol */
+   --accent-primary-hover: #085A66;
    --accent-secondary: #06B6D4;     /* Cyan */
+   --card-border-hover: rgba(10, 115, 130, 0.3);
    
    --text-primary: #F3F4F6;
    --text-secondary: #9CA3AF;
@@ -20,15 +29,81 @@
    --warning: #F59E0B;              /* Amber */
    --danger: #EF4444;               /* Ruby Red */
    
-   --glow-primary: rgba(168, 85, 247, 0.4);
+   --glow-primary: rgba(10, 115, 130, 0.4);
    --glow-success: rgba(16, 185, 129, 0.3);
    --glow-danger: rgba(239, 68, 68, 0.3);
 
-   --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-   --font-mono: 'Fira Code', monospace;
+   /* Scrollbar & Helpers */
+   --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+   --scrollbar-track: var(--bg-primary);
+   --radial-glow-1: rgba(10, 115, 130, 0.15);
+   --radial-glow-2: rgba(6, 182, 212, 0.07);
+   --brand-gradient: linear-gradient(135deg, #FFF 30%, var(--accent-primary) 100%);
+   --nav-bg: rgba(255, 255, 255, 0.03);
+   --nav-border: rgba(255, 255, 255, 0.05);
+   --nav-hover-bg: rgba(255, 255, 255, 0.05);
    
-   --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-   --transition-normal: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+   --input-bg: rgba(255, 255, 255, 0.04);
+   --input-border: rgba(255, 255, 255, 0.08);
+   --input-color: #ffffff;
+   --display-bg: rgba(255, 255, 255, 0.03);
+   --display-border: rgba(255, 255, 255, 0.06);
+
+   --btn-sec-bg: rgba(255, 255, 255, 0.06);
+   --btn-sec-border: rgba(255, 255, 255, 0.08);
+   --btn-sec-color: var(--text-primary);
+   --backdrop-bg: rgba(5, 3, 10, 0.8);
+   --header-border: rgba(255, 255, 255, 0.05);
+   --bank-card-separator: rgba(255, 255, 255, 0.05);
+}
+
+body.light-theme {
+   /* ── LIGHT THEME ────────────────────────────────────────────────── */
+   --bg-primary: #F3F4F6;           /* Soft elegant light-grey */
+   --bg-secondary: #FFFFFF;
+   --card-bg: rgba(255, 255, 255, 0.75);
+   --card-border: rgba(0, 0, 0, 0.07);
+   
+   /* Petrol Accent Palette (high readability contrast) */
+   --accent-primary: #085A66;       
+   --accent-primary-hover: #053C45;
+   --accent-secondary: #0891B2;     
+   --card-border-hover: rgba(10, 115, 130, 0.35);
+   
+   --text-primary: #1F2937;         /* High readability charcoal */
+   --text-secondary: #4B5563;
+   --text-muted: #9CA3AF;
+   
+   --success: #059669;              /* Darker Emerald */
+   --warning: #D97706;              /* Darker Amber */
+   --danger: #DC2626;               /* Darker Red */
+   
+   --glow-primary: rgba(8, 90, 102, 0.25);
+   --glow-success: rgba(5, 150, 105, 0.2);
+   --glow-danger: rgba(220, 38, 38, 0.2);
+
+   /* Scrollbar & Helpers */
+   --scrollbar-thumb: rgba(0, 0, 0, 0.15);
+   --scrollbar-track: var(--bg-primary);
+   --radial-glow-1: rgba(10, 115, 130, 0.06);
+   --radial-glow-2: rgba(6, 182, 212, 0.03);
+   --brand-gradient: linear-gradient(135deg, var(--text-primary) 30%, var(--accent-primary) 100%);
+   --nav-bg: rgba(0, 0, 0, 0.03);
+   --nav-border: rgba(0, 0, 0, 0.05);
+   --nav-hover-bg: rgba(0, 0, 0, 0.05);
+   
+   --input-bg: rgba(0, 0, 0, 0.02);
+   --input-border: rgba(0, 0, 0, 0.12);
+   --input-color: var(--text-primary);
+   --display-bg: rgba(0, 0, 0, 0.02);
+   --display-border: rgba(0, 0, 0, 0.06);
+
+   --btn-sec-bg: rgba(0, 0, 0, 0.04);
+   --btn-sec-border: rgba(0, 0, 0, 0.08);
+   --btn-sec-color: var(--text-primary);
+   --backdrop-bg: rgba(15, 23, 42, 0.4);
+   --header-border: rgba(0, 0, 0, 0.06);
+   --bank-card-separator: rgba(0, 0, 0, 0.06);
 }
 
 * {
@@ -47,8 +122,8 @@ body {
    -webkit-font-smoothing: antialiased;
    -moz-osx-font-smoothing: grayscale;
    background-image: 
-      radial-gradient(circle at 10% 20%, rgba(168, 85, 247, 0.07) 0%, transparent 40%),
-      radial-gradient(circle at 85% 80%, rgba(6, 182, 212, 0.07) 0%, transparent 40%);
+      radial-gradient(circle at 10% 20%, var(--radial-glow-1) 0%, transparent 40%),
+      radial-gradient(circle at 85% 80%, var(--radial-glow-2) 0%, transparent 40%);
    background-attachment: fixed;
 }
 
@@ -58,10 +133,10 @@ body {
    height: 8px;
 }
 ::-webkit-scrollbar-track {
-   background: var(--bg-primary);
+   background: var(--scrollbar-track);
 }
 ::-webkit-scrollbar-thumb {
-   background: rgba(255, 255, 255, 0.1);
+   background: var(--scrollbar-thumb);
    border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
@@ -81,14 +156,14 @@ header {
    align-items: center;
    margin-bottom: 2.5rem;
    padding-bottom: 1.5rem;
-   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+   border-bottom: 1px solid var(--header-border);
 }
 
 .brand-section h1 {
    font-size: 1.8rem;
    font-weight: 700;
    letter-spacing: -0.5px;
-   background: linear-gradient(135deg, #FFF 30%, var(--accent-primary) 100%);
+   background: var(--brand-gradient);
    -webkit-background-clip: text;
    -webkit-text-fill-color: transparent;
    display: flex;
@@ -105,8 +180,8 @@ header {
 /* Navigation Tabs */
 .nav-tabs {
    display: flex;
-   background: rgba(255, 255, 255, 0.03);
-   border: 1px solid rgba(255, 255, 255, 0.05);
+   background: var(--nav-bg);
+   border: 1px solid var(--nav-border);
    padding: 0.35rem;
    border-radius: 12px;
    gap: 0.25rem;
@@ -131,13 +206,37 @@ header {
 
 .nav-tab:hover {
    color: var(--text-primary);
-   background: rgba(255, 255, 255, 0.05);
+   background: var(--nav-hover-bg);
 }
 
 .nav-tab.active {
-   color: #fff;
+   color: #ffffff;
    background: var(--accent-primary);
    box-shadow: 0 4px 12px var(--glow-primary);
+}
+
+/* Header Controls Container */
+.header-controls {
+   display: flex;
+   align-items: center;
+   gap: 0.75rem;
+}
+
+#theme-toggle-btn {
+   padding: 0;
+   width: 40px;
+   height: 40px;
+   border-radius: 50% !important;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   font-size: 1.1rem;
+   cursor: pointer;
+   transition: var(--transition-fast);
+}
+
+#theme-toggle-btn:hover {
+   transform: rotate(15deg) scale(1.05);
 }
 
 /* Main Grid & Pages */
@@ -267,11 +366,11 @@ header {
 }
 
 .input-field {
-   background: rgba(255, 255, 255, 0.04);
-   border: 1px solid rgba(255, 255, 255, 0.08);
+   background: var(--input-bg);
+   border: 1px solid var(--input-border);
    padding: 0.65rem 0.85rem;
    border-radius: 8px;
-   color: #fff;
+   color: var(--input-color);
    font-family: var(--font-sans);
    font-size: 0.95rem;
    transition: var(--transition-fast);
@@ -280,8 +379,8 @@ header {
 .input-field:focus {
    outline: none;
    border-color: var(--accent-primary);
-   background: rgba(255, 255, 255, 0.07);
-   box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2);
+   background: var(--input-bg);
+   box-shadow: 0 0 0 2px var(--glow-primary);
 }
 
 /* Buttons */
@@ -313,12 +412,13 @@ header {
 }
 
 .btn.secondary {
-   background: rgba(255, 255, 255, 0.06);
-   border: 1px solid rgba(255, 255, 255, 0.08);
+   background: var(--btn-sec-bg);
+   border: 1px solid var(--btn-sec-border);
+   color: var(--btn-sec-color);
 }
 
 .btn.secondary:hover {
-   background: rgba(255, 255, 255, 0.1);
+   background: var(--nav-hover-bg);
    box-shadow: none;
 }
 
@@ -394,7 +494,7 @@ header {
 }
 
 .accounts-sublist {
-   border-top: 1px solid rgba(255, 255, 255, 0.05);
+   border-top: 1px solid var(--bank-card-separator);
    padding-top: 0.75rem;
    margin-top: 0.75rem;
 }
@@ -436,7 +536,7 @@ header {
    left: 0;
    width: 100vw;
    height: 100vh;
-   background: rgba(5, 3, 10, 0.8);
+   background: var(--backdrop-bg);
    backdrop-filter: blur(8px);
    z-index: 100;
    display: flex;
@@ -496,13 +596,13 @@ header {
    justify-content: flex-end;
    gap: 0.75rem;
    margin-top: 1.5rem;
-   border-top: 1px solid rgba(255, 255, 255, 0.05);
+   border-top: 1px solid var(--bank-card-separator);
    padding-top: 1.25rem;
 }
 
 /* Modal Accounts Input Section */
 .modal-accounts-section {
-   border-top: 1px solid rgba(255, 255, 255, 0.05);
+   border-top: 1px solid var(--bank-card-separator);
    padding-top: 1rem;
    margin-top: 0.5rem;
 }
@@ -608,8 +708,7 @@ header {
    border: 1px solid var(--card-border);
    padding: 0.85rem 1.25rem;
    border-radius: 10px;
-   color: #fff;
-   font-size: 0.9rem;
+   color: var(--text-primary);
    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
    display: flex;
    align-items: center;
@@ -798,8 +897,8 @@ header {
       grid-template-columns: 1fr auto !important;
       grid-template-rows: auto auto;
       gap: 0.5rem;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--bank-card-separator);
+      background: var(--display-bg);
       padding: 0.75rem;
       border-radius: 10px;
       margin-bottom: 0.75rem;
@@ -869,7 +968,7 @@ header {
       display: block;
       width: 38px;
       height: 5px;
-      background: rgba(255, 255, 255, 0.2);
+      background: var(--text-muted);
       border-radius: 3px;
       margin: -0.5rem auto 1rem auto;
    }

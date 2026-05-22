@@ -39,6 +39,9 @@ document.addEventListener('DOMContentLoaded', () => {
    const refreshLogsBtn = document.getElementById('refresh-logs-btn');
    const clearLogsUiBtn = document.getElementById('clear-logs-ui-btn');
 
+   // Theme
+   const themeToggleBtn = document.getElementById('theme-toggle-btn');
+
    // Modal
    const bankModal = document.getElementById('bank-modal');
    const bankForm = document.getElementById('bank-form');
@@ -764,6 +767,20 @@ document.addEventListener('DOMContentLoaded', () => {
               btnTestPush.disabled = false;
               btnTestPush.innerHTML = '<span>🔔</span> Testen';
            }
+        });
+     }
+
+     // --- THEME TOGGLE ---
+     if (themeToggleBtn) {
+        const isLight = document.body.classList.contains('light-theme');
+        themeToggleBtn.innerHTML = isLight ? '<span>🌙</span>' : '<span>☀️</span>';
+
+        themeToggleBtn.addEventListener('click', (e) => {
+           e.preventDefault();
+           const isLightNow = document.body.classList.toggle('light-theme');
+           localStorage.setItem('theme', isLightNow ? 'light' : 'dark');
+           themeToggleBtn.innerHTML = isLightNow ? '<span>🌙</span>' : '<span>☀️</span>';
+           showToast(isLightNow ? 'Helles Design aktiviert! ☀️' : 'Dunkles Design aktiviert! 🌙', 'info');
         });
      }
 

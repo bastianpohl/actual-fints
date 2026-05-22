@@ -7,6 +7,14 @@
    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+   <script>
+      (function() {
+         const savedTheme = localStorage.getItem('theme') || 'dark';
+         if (savedTheme === 'light') {
+            document.body.classList.add('light-theme');
+         }
+      })();
+   </script>
    <div class="app-container">
       
       <!-- Brand Header -->
@@ -15,17 +23,22 @@
             <h1>🏦 Actual‑FinTS Connector</h1>
             <p>Deutscher Banken-Sync für Actual Budget</p>
          </div>
-         <nav class="nav-tabs">
-            <button class="nav-tab active" data-tab="dashboard">
-               <span>📊</span> Dashboard
+         <div class="header-controls">
+            <nav class="nav-tabs">
+               <button class="nav-tab active" data-tab="dashboard">
+                  <span>📊</span> Dashboard
+               </button>
+               <button class="nav-tab" data-tab="banks" id="banks-tab-btn">
+                  <span>🏦</span> Banken
+               </button>
+               <button class="nav-tab" data-tab="logs" id="logs-tab-btn">
+                  <span>📟</span> System-Logs
+               </button>
+            </nav>
+            <button class="btn secondary" id="theme-toggle-btn" title="Design umschalten">
+               <span>☀️</span>
             </button>
-            <button class="nav-tab" data-tab="banks" id="banks-tab-btn">
-               <span>🏦</span> Banken
-            </button>
-            <button class="nav-tab" data-tab="logs" id="logs-tab-btn">
-               <span>📟</span> System-Logs
-            </button>
-         </nav>
+         </div>
       </header>
 
       <!-- Page 1: Dashboard -->
