@@ -784,6 +784,25 @@ document.addEventListener('DOMContentLoaded', () => {
         });
      }
 
+     // Listen for system/browser color scheme changes dynamically
+     const systemThemeMedia = window.matchMedia('(prefers-color-scheme: light)');
+     if (systemThemeMedia && typeof systemThemeMedia.addEventListener === 'function') {
+        systemThemeMedia.addEventListener('change', (e) => {
+           // Only update theme dynamically if the user hasn't explicitly set a preference in localStorage
+           if (!localStorage.getItem('theme')) {
+              const isLightNow = e.matches;
+              if (isLightNow) {
+                 document.body.classList.add('light-theme');
+              } else {
+                 document.body.classList.remove('light-theme');
+              }
+              if (themeToggleBtn) {
+                 themeToggleBtn.innerHTML = isLightNow ? '<span>🌙</span>' : '<span>☀️</span>';
+              }
+           }
+        });
+     }
+
      // --- INITIAL LOADING ---
     loadStatus();
     loadNtfyTopic();

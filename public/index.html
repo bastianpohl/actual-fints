@@ -9,8 +9,9 @@
 <body>
    <script>
       (function() {
-         const savedTheme = localStorage.getItem('theme') || 'dark';
-         if (savedTheme === 'light') {
+         const savedTheme = localStorage.getItem('theme');
+         const systemPrefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+         if (savedTheme === 'light' || (!savedTheme && systemPrefersLight)) {
             document.body.classList.add('light-theme');
          }
       })();
