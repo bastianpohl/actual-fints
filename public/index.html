@@ -256,10 +256,70 @@
 
             </div>
 
-            <!-- Right Column: Push settings -->
-            <div>
+            <!-- Right Column: Budget & Push settings -->
+            <div style="display:flex; flex-direction:column; gap:1.5rem;">
+
+               <!-- Actual Budget Verbindung Settings Card -->
+               <div class="glass-card">
+                  <h2 style="font-size:1.2rem; font-weight:600; margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
+                     <span class="material-icons" style="color: var(--accent-primary);">account_balance_wallet</span> Actual Budget Verbindung
+                  </h2>
+                  
+                  <!-- 1. READ-ONLY VIEW (Default) -->
+                  <div id="ab-read-view" style="display:flex; flex-direction:column; gap:0.75rem; font-size:0.9rem;">
+                     <div class="form-group" style="margin-bottom:0.25rem;">
+                        <span style="font-size:0.75rem; color: var(--text-secondary);">Server-URL</span>
+                        <div style="display:flex; align-items:center; justify-content:space-between; background: var(--display-bg); border: 1px solid var(--display-border); padding: 0.4rem 0.6rem; border-radius: 8px; margin-top: 0.25rem; min-height:36px;">
+                           <span id="ab-url-display" style="font-family: var(--font-mono); font-size:0.85rem; word-break:break-all; color: var(--text-primary);">-</span>
+                        </div>
+                     </div>
+                     <div class="form-group" style="margin-bottom:0.25rem;">
+                        <span style="font-size:0.75rem; color: var(--text-secondary);">Budget Sync ID</span>
+                        <div style="display:flex; align-items:center; justify-content:space-between; background: var(--display-bg); border: 1px solid var(--display-border); padding: 0.4rem 0.6rem; border-radius: 8px; margin-top: 0.25rem; min-height:36px;">
+                           <span id="ab-sync-display" style="font-family: var(--font-mono); font-size:0.85rem; word-break:break-all; color: var(--text-primary);">-</span>
+                        </div>
+                     </div>
+                     <div class="form-group" style="margin-bottom:0.25rem;">
+                        <span style="font-size:0.75rem; color: var(--text-secondary);">Verbindungs-Passwort</span>
+                        <div style="display:flex; align-items:center; justify-content:space-between; background: var(--display-bg); border: 1px solid var(--display-border); padding: 0.4rem 0.6rem; border-radius: 8px; margin-top: 0.25rem; min-height:36px;">
+                           <span id="ab-pass-status" style="font-size:0.85rem; color: var(--text-primary);">-</span>
+                        </div>
+                     </div>
+                     <div style="display:flex; gap:0.5rem; margin-top:1.25rem; width:100%;">
+                        <button class="btn secondary" id="btn-ab-switch-to-edit" style="flex:1;">
+                           <span class="material-icons btn-icon">edit</span> Editieren
+                        </button>
+                     </div>
+                  </div>
+
+                  <!-- 2. EDIT VIEW (Hidden by default) -->
+                  <div id="ab-edit-view" style="display:none; flex-direction:column; gap:0.75rem; font-size:0.9rem;">
+                     <div class="form-group" style="margin-bottom:0.25rem;">
+                        <label for="ab-url-input" style="font-size:0.75rem; color: var(--text-secondary);">Server-URL</label>
+                        <input type="url" id="ab-url-input" class="input-field" style="font-size:0.85rem; padding:0.4rem 0.6rem; height:36px; margin-top:0.25rem;" placeholder="z.B. https://actual.yourdomain.de">
+                     </div>
+                     <div class="form-group" style="margin-bottom:0.25rem;">
+                        <label for="ab-sync-input" style="font-size:0.75rem; color: var(--text-secondary);">Budget Sync ID</label>
+                        <input type="text" id="ab-sync-input" class="input-field" style="font-family: var(--font-mono); font-size:0.85rem; padding:0.4rem 0.6rem; height:36px; margin-top:0.25rem;" placeholder="z.B. user-sync-id">
+                     </div>
+                     <div class="form-group" style="margin-bottom:0.25rem;">
+                        <label for="ab-pass-input" style="font-size:0.75rem; color: var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
+                           Passwort / Token
+                           <button id="btn-ab-show-pass" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.75rem; padding:0; outline:none;">Anzeigen</button>
+                        </label>
+                        <input type="password" id="ab-pass-input" class="input-field" style="font-size:0.85rem; padding:0.4rem 0.6rem; height:36px; margin-top:0.25rem;" placeholder="Unverändert lassen oder neues Passwort eingeben">
+                     </div>
+                     <div style="display:flex; gap:0.5rem; margin-top:1.25rem;">
+                        <button class="btn secondary" id="btn-ab-cancel-edit" style="flex:1;">Abbrechen</button>
+                        <button class="btn" id="save-ab-btn" style="flex:1;">
+                           <span class="material-icons btn-icon">save</span> Speichern
+                        </button>
+                     </div>
+                  </div>
+               </div>
+
                <!-- Push-Benachrichtigungen Box -->
-               <div class="glass-card" style="display:flex; flex-direction:column; justify-content:space-between; height: 100%;">
+               <div class="glass-card" style="display:flex; flex-direction:column; justify-content:space-between; height: auto;">
                   <div>
                      <h2 style="font-size:1.2rem; font-weight:600; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
                         <span class="material-icons" style="color: var(--accent-primary);">notifications</span> Push-Notifications

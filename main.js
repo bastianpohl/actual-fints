@@ -24,8 +24,15 @@ const main = async () => {
 
    const store = new CredentialsStore(masterKey);
    let banks;
+   let actualConfig = {};
    try {
       banks = store.getAllBanks();
+      actualConfig = {
+         serverUrl: store.getConfig('actual_server_url') || process.env.AB_URL,
+         password: store.getEncryptedConfig('actual_password') || process.env.AB_PASS,
+         syncDb: store.getConfig('actual_sync_db') || process.env.AB_SYNC_DB,
+         dataDir: store.getConfig('actual_data_dir') || process.env.AB_PATH || './actual-budget/'
+      };
    } finally {
       store.close();
    }
@@ -35,7 +42,7 @@ const main = async () => {
       return [];
    }
 
-   const budgetClient = new BudgetClient();
+   const budgetClient = new BudgetClient(actualConfig);
    await budgetClient.loadBudget();
    await budgetClient.getAccounts();
 

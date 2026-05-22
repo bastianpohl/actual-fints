@@ -225,3 +225,30 @@ test('CredentialsStore listBanks returns names and counts', (t) => {
 
    store.close();
 });
+
+test('CredentialsStore can set, get, encrypt, decrypt and delete config values', (t) => {
+   t.after(cleanup);
+   const store = new CredentialsStore(MASTER_KEY, TEST_DB);
+
+   // Test plaintext config
+   store.setConfig('test_plain_key', 'plain_value');
+   assert.equal(store.getConfig('test_plain_key'), 'plain_value');
+
+   // Test encrypted config
+   store.setEncryptedConfig('test_encrypted_key', 'super_secret_value');
+   assert.equal(store.getEncryptedConfig('test_encrypted_key'), 'super_secret_value');
+
+   // Verify it is encrypted on disk
+   const rawConfig = store.getConfig('test_encrypted_key');
+   assert.notEqual(rawConfig, 'super_secret_value');
+   assert.ok(rawConfig.includes(':')); // Part of IV:TAG:CIPHERTEXT format
+
+   // Test delete config
+   store.deleteConfig('test_plain_key');
+   assert.equal(store.getConfig('test_plain_key'), null);
+
+   store.deleteConfig('test_encrypted_key');
+   assert.equal(store.getEncryptedConfig('test_encrypted_key'), null);
+
+   store.close();
+});

@@ -60,25 +60,45 @@ const restartServiceInBackground = () => {
 // GET /api/status - Get current configuration status and latest logs meta
 app.get('/api/status', (req, res) => {
    const masterKey = process.env.MASTER_KEY;
-   const status = {
-      actualBudgetConfigured: !!(process.env.AB_URL && process.env.AB_PASS && process.env.AB_SYNC_DB),
-      masterKeyConfigured: !!masterKey,
-      bankCount: 0,
-      accountCount: 0,
-      lastSync: null,
-   };
+   let actualBudgetConfigured = false;
+   let bankCount = 0;
+   let accountCount = 0;
+   let dbError = null;
 
    if (masterKey) {
       const store = new CredentialsStore(masterKey);
       try {
          const banks = store.listBanks() || [];
-         status.bankCount = banks.length;
-         status.accountCount = banks.reduce((sum, b) => sum + (b.accountCount || 0), 0);
+         bankCount = banks.length;
+         accountCount = banks.reduce((sum, b) => sum + (b.accountCount || 0), 0);
+
+         // Read connection parameters from SQLite
+         const abUrl = store.getConfig('actual_server_url');
+         const abPass = store.getEncryptedConfig('actual_password');
+         const abSync = store.getConfig('actual_sync_db');
+         actualBudgetConfigured = !!(abUrl && abPass && abSync);
       } catch (err) {
-         status.dbError = err.message;
+         dbError = err.message;
       } finally {
          store.close();
       }
+   }
+
+   // Fallback to environment variables if not configured in SQLite
+   if (!actualBudgetConfigured) {
+      actualBudgetConfigured = !!(process.env.AB_URL && process.env.AB_PASS && process.env.AB_SYNC_DB);
+   }
+
+   const status = {
+      actualBudgetConfigured,
+      masterKeyConfigured: !!masterKey,
+      bankCount,
+      accountCount,
+      lastSync: null,
+   };
+
+   if (dbError) {
+      status.dbError = dbError;
    }
 
    if (fs.existsSync(LOG_FILE)) {
@@ -101,14 +121,14 @@ app.get('/api/banks', (req, res) => {
    const store = new CredentialsStore(masterKey);
    try {
       const banks = store.getAllBanks();
-      // Mask the PIN and sensitive fields for security on display, but keep other parts
+      // Mask both PIN and Login/Username for security on display
       const safeBanks = banks.map(b => ({
          ...b,
          fints: {
             url: b.fints.url,
             blz: b.fints.blz,
-            login: b.fints.login,
-            pin: '●●●●●●●●', // Do not return the actual pin over the API
+            login: '●●●●●●●●', // Do not return raw login over the API
+            pin: '●●●●●●●●', // Do not return raw PIN over the API
          }
       }));
       return res.json(safeBanks);
@@ -153,7 +173,7 @@ app.put('/api/banks/:name', (req, res) => {
       const updates = {};
       if (url) updates.url = url;
       if (blz) updates.blz = blz;
-      if (login) updates.login = login;
+      if (login && login !== '●●●●●●●●') updates.login = login; // Only update if actual new login provided
       if (pin && pin !== '●●●●●●●●') updates.pin = pin; // Only update if actual new pin provided
       if (newName) updates.name = newName;
       if (accounts) updates.accounts = accounts;
@@ -265,6 +285,49 @@ app.post('/api/notifications/config', (req, res) => {
       store.setConfig('ntfy_topic', topic.trim());
       store.setConfig('ntfy_server', server.trim());
       return res.json({ success: true, topic: topic.trim(), server: server.trim() });
+   } catch (err) {
+      return res.status(500).json({ error: err.message });
+   } finally {
+      store.close();
+   }
+});
+
+// GET /api/budget/config - Retrieve Actual Budget connection config
+app.get('/api/budget/config', (req, res) => {
+   const masterKey = process.env.MASTER_KEY;
+   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht gesetzt.' });
+
+   const store = new CredentialsStore(masterKey);
+   try {
+      const url = store.getConfig('actual_server_url') || '';
+      const syncDb = store.getConfig('actual_sync_db') || '';
+      const hasPassword = !!store.getEncryptedConfig('actual_password');
+      return res.json({ url, syncDb, hasPassword });
+   } catch (err) {
+      return res.status(500).json({ error: err.message });
+   } finally {
+      store.close();
+   }
+});
+
+// POST /api/budget/config - Save Actual Budget connection config
+app.post('/api/budget/config', (req, res) => {
+   const masterKey = process.env.MASTER_KEY;
+   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht gesetzt.' });
+
+   const { url, syncDb, password } = req.body ?? {};
+   if (url === undefined || syncDb === undefined) {
+      return res.status(400).json({ error: 'Server URL und Budget Sync ID sind erforderlich.' });
+   }
+
+   const store = new CredentialsStore(masterKey);
+   try {
+      store.setConfig('actual_server_url', url.trim());
+      store.setConfig('actual_sync_db', syncDb.trim());
+      if (password && password !== '●●●●●●●●') {
+         store.setEncryptedConfig('actual_password', password.trim());
+      }
+      return res.json({ success: true });
    } catch (err) {
       return res.status(500).json({ error: err.message });
    } finally {

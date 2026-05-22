@@ -204,31 +204,13 @@ document.addEventListener('DOMContentLoaded', () => {
           configMasterKey.textContent = data.masterKeyConfigured ? 'Konfiguriert (AES-GCM)' : 'Fehlt';
           configMasterKey.style.color = data.masterKeyConfigured ? 'var(--success)' : 'var(--danger)';
  
-          // Fetch direct env configs for dashboard if available
-          // For security we mask URL and Sync DB mildly but show status
-          fetchBanksMeta();
- 
+          // Actual Budget settings are loaded separately by loadAbConfig()
+
        } catch (err) {
           console.error('Error fetching status:', err);
           showToast('System-Status konnte nicht geladen werden.', 'error');
        }
     };
-
-   // Helper to extract system env data for the info card
-   const fetchBanksMeta = async () => {
-      try {
-         // Standard credentials database status
-         const res = await fetch('/api/banks');
-         if (res.ok) {
-            const banks = await res.json();
-            // Just general display mappings
-            configAbUrl.textContent = window.location.origin;
-            configAbSync.textContent = 'credentials.db';
-         }
-      } catch (e) {
-         // ignore
-      }
-   };
 
    // 2. Fetch Bank list
    const loadBanks = async () => {
@@ -497,6 +479,8 @@ document.addEventListener('DOMContentLoaded', () => {
       inputUrl.value = '';
       inputBlz.value = '';
       inputLogin.value = '';
+      inputLogin.placeholder = 'Benutzername/Kontonr';
+      inputLogin.required = true;
       inputPin.value = '';
       inputPin.placeholder = 'Passwort/PIN';
       inputPin.required = true;
@@ -520,6 +504,8 @@ document.addEventListener('DOMContentLoaded', () => {
       inputUrl.value = bank.fints.url;
       inputBlz.value = bank.fints.blz;
       inputLogin.value = bank.fints.login;
+      inputLogin.placeholder = '●●●●●●●● (Unverändert lassen)';
+      inputLogin.required = false;
       
       // Leave PIN blank unless user wants to change it
       inputPin.value = '';
@@ -797,6 +783,162 @@ document.addEventListener('DOMContentLoaded', () => {
         });
      }
 
+   // --- ACTUAL BUDGET CONNECTION HANDLERS ---
+   let lastSavedAbUrl = '';
+   let lastSavedAbSync = '';
+   let lastSavedAbHasPassword = false;
+
+   const loadAbConfig = async () => {
+      try {
+         const res = await fetch('/api/budget/config');
+         if (res.ok) {
+            const data = await res.json();
+            lastSavedAbUrl = data.url || '';
+            lastSavedAbSync = data.syncDb || '';
+            lastSavedAbHasPassword = data.hasPassword;
+
+            const abUrlDisplay = document.getElementById('ab-url-display');
+            const abSyncDisplay = document.getElementById('ab-sync-display');
+            const abPassStatus = document.getElementById('ab-pass-status');
+            const abUrlInput = document.getElementById('ab-url-input');
+            const abSyncInput = document.getElementById('ab-sync-input');
+            const abPassInput = document.getElementById('ab-pass-input');
+
+            if (abUrlDisplay) abUrlDisplay.textContent = lastSavedAbUrl || 'Nicht konfiguriert';
+            if (abSyncDisplay) abSyncDisplay.textContent = lastSavedAbSync || 'Nicht konfiguriert';
+            if (abPassStatus) abPassStatus.textContent = lastSavedAbHasPassword ? '●●●●●●●● (Konfiguriert)' : 'Nicht konfiguriert';
+
+            if (abUrlInput) abUrlInput.value = lastSavedAbUrl;
+            if (abSyncInput) abSyncInput.value = lastSavedAbSync;
+            if (abPassInput) abPassInput.value = lastSavedAbHasPassword ? '●●●●●●●●' : '';
+
+            if (configAbUrl) configAbUrl.textContent = lastSavedAbUrl || 'Nicht konfiguriert';
+            if (configAbSync) configAbSync.textContent = lastSavedAbSync || 'Nicht konfiguriert';
+         }
+      } catch (err) {
+         console.error('Error fetching ab config:', err);
+      }
+   };
+
+   const btnAbSwitchToEdit = document.getElementById('btn-ab-switch-to-edit');
+   const btnAbCancelEdit = document.getElementById('btn-ab-cancel-edit');
+   const abReadView = document.getElementById('ab-read-view');
+   const abEditView = document.getElementById('ab-edit-view');
+   const btnAbShowPass = document.getElementById('btn-ab-show-pass');
+   const saveAbBtn = document.getElementById('save-ab-btn');
+   const abPassInput = document.getElementById('ab-pass-input');
+
+   if (btnAbSwitchToEdit && abReadView && abEditView) {
+      btnAbSwitchToEdit.addEventListener('click', (e) => {
+         e.preventDefault();
+         abReadView.style.display = 'none';
+         abEditView.style.display = 'flex';
+      });
+   }
+
+   if (btnAbCancelEdit && abReadView && abEditView) {
+      btnAbCancelEdit.addEventListener('click', (e) => {
+         e.preventDefault();
+         const abUrlInput = document.getElementById('ab-url-input');
+         const abSyncInput = document.getElementById('ab-sync-input');
+         const abPassInput = document.getElementById('ab-pass-input');
+
+         if (abUrlInput) abUrlInput.value = lastSavedAbUrl;
+         if (abSyncInput) abSyncInput.value = lastSavedAbSync;
+         if (abPassInput) abPassInput.value = lastSavedAbHasPassword ? '●●●●●●●●' : '';
+         
+         if (abPassInput) abPassInput.type = 'password';
+         if (btnAbShowPass) btnAbShowPass.textContent = 'Anzeigen';
+
+         abEditView.style.display = 'none';
+         abReadView.style.display = 'flex';
+      });
+   }
+
+   if (btnAbShowPass && abPassInput) {
+      btnAbShowPass.addEventListener('click', (e) => {
+         e.preventDefault();
+         if (abPassInput.type === 'password') {
+            abPassInput.type = 'text';
+            btnAbShowPass.textContent = 'Verbergen';
+         } else {
+            abPassInput.type = 'password';
+            btnAbShowPass.textContent = 'Anzeigen';
+         }
+      });
+   }
+
+   if (saveAbBtn) {
+      saveAbBtn.addEventListener('click', async (e) => {
+         e.preventDefault();
+         const abUrlInput = document.getElementById('ab-url-input');
+         const abSyncInput = document.getElementById('ab-sync-input');
+         const abPassInput = document.getElementById('ab-pass-input');
+
+         const url = abUrlInput ? abUrlInput.value.trim() : '';
+         const syncDb = abSyncInput ? abSyncInput.value.trim() : '';
+         const password = abPassInput ? abPassInput.value.trim() : '';
+
+         if (!url || !syncDb) {
+            showToast('Server-URL und Budget Sync ID sind erforderlich.', 'error');
+            return;
+         }
+
+         try {
+            saveAbBtn.disabled = true;
+            saveAbBtn.innerHTML = '<span class="material-icons btn-icon spinning-icon">sync</span> Speichern...';
+
+            const res = await fetch('/api/budget/config', {
+               method: 'POST',
+               headers: {
+                  'Content-Type': 'application/json'
+               },
+               body: JSON.stringify({ url, syncDb, password })
+            });
+
+            if (res.ok) {
+               showToast('Actual Budget Verbindung erfolgreich gespeichert!', 'success');
+               lastSavedAbUrl = url;
+               lastSavedAbSync = syncDb;
+               if (password && password !== '●●●●●●●●') {
+                  lastSavedAbHasPassword = true;
+               }
+
+               const abUrlDisplay = document.getElementById('ab-url-display');
+               const abSyncDisplay = document.getElementById('ab-sync-display');
+               const abPassStatus = document.getElementById('ab-pass-status');
+
+               if (abUrlDisplay) abUrlDisplay.textContent = url;
+               if (abSyncDisplay) abSyncDisplay.textContent = syncDb;
+               if (abPassStatus) abPassStatus.textContent = (password || lastSavedAbHasPassword) ? '●●●●●●●● (Konfiguriert)' : 'Nicht konfiguriert';
+
+               if (configAbUrl) configAbUrl.textContent = url;
+               if (configAbSync) configAbSync.textContent = syncDb;
+
+               if (abPassInput) abPassInput.type = 'password';
+               if (btnAbShowPass) btnAbShowPass.textContent = 'Anzeigen';
+
+               // Trigger status load to verify Actual badge
+               loadStatus();
+
+               if (abEditView && abReadView) {
+                  abEditView.style.display = 'none';
+                  abReadView.style.display = 'flex';
+               }
+            } else {
+               const errData = await res.json();
+               showToast(errData.error || 'Fehler beim Speichern der Verbindung.', 'error');
+            }
+         } catch (err) {
+            console.error('Error saving ab config:', err);
+            showToast('Serverfehler beim Speichern.', 'error');
+         } finally {
+            saveAbBtn.disabled = false;
+            saveAbBtn.innerHTML = '<span class="material-icons btn-icon">save</span> Speichern';
+         }
+      });
+   }
+
      // --- THEME MANAGEMENT ---
      const applyTheme = () => {
         const themeAuto = localStorage.getItem('theme_auto') !== 'false';
@@ -872,6 +1014,7 @@ document.addEventListener('DOMContentLoaded', () => {
      loadStatus();
      loadBanks();
      loadNtfyTopic();
+     loadAbConfig();
      applyTheme();
 
    // --- HELPERS ---
