@@ -142,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
          // Update active nav button
          tabs.forEach(t => t.classList.remove('active'));
-         tab.classList.add('active');
+         document.querySelectorAll(`.nav-tab[data-tab="${targetTab}"]`).forEach(t => t.classList.add('active'));
 
          // Show target content
          tabContents.forEach(content => {
