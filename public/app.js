@@ -167,6 +167,80 @@ document.addEventListener('DOMContentLoaded', () => {
 
    // --- API INTEGRATION ---
 
+    function translateCronToGerman(cronStr) {
+       if (!cronStr) return 'Inaktiv';
+       const parts = cronStr.trim().split(/\s+/);
+       if (parts.length < 5) return 'Ungültiges Format';
+
+       const [min, hour, dom, month, dow] = parts;
+
+       // Common exact matches
+       const exactMatches = {
+          '59 7-23/4 * * 1-6': 'Montag bis Samstag alle 4 Stunden um xx:59 (7 - 23 Uhr)',
+          '0 * * * *': 'Stündlich zur vollen Stunde',
+          '0 0 * * *': 'Täglich um 00:00 Uhr',
+          '0 12 * * *': 'Täglich um 12:00 Uhr',
+       };
+
+       if (exactMatches[cronStr.trim()]) {
+          return exactMatches[cronStr.trim()];
+       }
+
+       try {
+          // General parsing logic
+          let minStr = '';
+          if (min === '*') minStr = 'jede Minute';
+          else if (min.startsWith('*/')) minStr = `alle ${min.split('/')[1]} Minuten`;
+          else minStr = `zur Minute ${min}`;
+
+          let hourStr = '';
+          if (hour === '*') hourStr = 'jede Stunde';
+          else if (hour.startsWith('*/')) hourStr = `alle ${hour.split('/')[1]} Stunden`;
+          else if (hour.includes('-')) {
+             const [range, step] = hour.split('/');
+             const [start, end] = range.split('-');
+             if (step) {
+                hourStr = `alle ${step} Stunden von ${start} bis ${end} Uhr`;
+             } else {
+                hourStr = `stündlich von ${start} bis ${end} Uhr`;
+             }
+          } else hourStr = `um ${hour.padStart(2, '0')}:xx Uhr`;
+
+          let dowStr = '';
+          if (dow === '*') dowStr = 'jeden Tag';
+          else if (dow === '1-5') dowStr = 'Montag bis Freitag';
+          else if (dow === '1-6') dowStr = 'Montag bis Samstag';
+          else if (dow === '0,6' || dow === '6,0' || dow === '6,7' || dow === '7,6') dowStr = 'am Wochenende';
+          else {
+             const days = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+             const parts = dow.split(',').map(d => days[parseInt(d, 10)] || d);
+             dowStr = `an folgenden Wochentagen: ${parts.join(', ')}`;
+          }
+
+          if (min !== '*' && !min.includes('/') && hour.includes('-') && hour.includes('/')) {
+             const [range, step] = hour.split('/');
+             const [start, end] = range.split('-');
+             return `${dowStr === 'jeden Tag' ? 'Täglich' : dowStr} alle ${step} Stunden um xx:${min.padStart(2, '0')} (${start} - ${end} Uhr)`;
+          }
+
+          if (min === '0' && hour !== '*' && !hour.includes('/') && !hour.includes('-') && dow !== '*') {
+             return `${dowStr === 'jeden Tag' ? 'Täglich' : dowStr} um ${hour.padStart(2, '0')}:00 Uhr`;
+          }
+
+          if (min.startsWith('*/') && hour === '*' && dow === '*') {
+             return `Alle ${min.split('/')[1]} Minuten`;
+          }
+
+          if (min === '0' && hour.startsWith('*/') && dow === '*') {
+             return `Alle ${hour.split('/')[1]} Stunden`;
+          }
+
+          return `${dowStr === 'jeden Tag' ? 'Täglich' : dowStr}, ${hourStr}, ${minStr}`;
+       } catch (e) {
+          return 'Benutzerdefiniertes Intervall';
+       }
+    }
+
     // 1. Fetch System Status
     const loadStatus = async () => {
        try {
@@ -208,12 +282,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
           // Populate Cron Sync details
           const cronScheduleDisplay = document.getElementById('cron-schedule-display');
+          const cronHumanDisplay = document.getElementById('cron-human-display');
           const cronLastDisplay = document.getElementById('cron-last-display');
           const cronNextDisplay = document.getElementById('cron-next-display');
           const btnViewCronLog = document.getElementById('btn-view-cron-log');
 
+          const activeSchedule = data.cronSchedule || '59 7-23/4 * * 1-6';
           if (cronScheduleDisplay) {
-             cronScheduleDisplay.textContent = data.cronSchedule || '59 7-23/4 * * 1-6';
+             cronScheduleDisplay.textContent = activeSchedule;
+          }
+          if (cronHumanDisplay) {
+             cronHumanDisplay.textContent = translateCronToGerman(activeSchedule);
           }
 
           if (cronLastDisplay) {
@@ -1040,7 +1119,13 @@ document.addEventListener('DOMContentLoaded', () => {
            const data = await res.json();
 
            if (res.ok && data.success) {
-              showToast('Test-Push-Mitteilung wurde an alle aktiven Abonnements gesendet!', 'success');
+              const failures = data.results ? data.results.filter(r => r.status.startsWith('Fehler') || r.status.startsWith('Entfernt')) : [];
+              if (failures.length > 0) {
+                 const errorMsg = failures.map(d => `${d.deviceName}: ${d.status}`).join(', ');
+                 showToast(`Mitteilung fehlgeschlagen für: ${errorMsg}`, 'error');
+              } else {
+                 showToast('Test-Push-Mitteilung wurde an alle aktiven Abonnements gesendet!', 'success');
+              }
               loadPushSubscriptions();
            } else {
               showToast(data.error || 'Fehler beim Senden der Test-Push-Mitteilung.', 'error');

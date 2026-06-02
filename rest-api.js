@@ -1,3 +1,6 @@
+const util = require('node:util');
+util.inspect.defaultOptions.depth = 5;
+
 const express = require('express');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
@@ -90,8 +93,9 @@ function getVapidKeys() {
       }
       vapidKeys = JSON.parse(keysJson);
       
+      const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:bastian@pohl.info';
       webpush.setVapidDetails(
-         'mailto:admin@actual-fints.local',
+         vapidSubject,
          vapidKeys.publicKey,
          vapidKeys.privateKey
       );

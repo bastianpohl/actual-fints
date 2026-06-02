@@ -1,3 +1,6 @@
+const util = require('node:util');
+util.inspect.defaultOptions.depth = 5;
+
 const { FinTSClient } = require('./lib/fints-api');
 const { BudgetClient } = require('./lib/budget-api');
 const { CredentialsStore } = require('./lib/credentials-store');

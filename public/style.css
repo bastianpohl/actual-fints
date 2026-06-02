@@ -65,9 +65,9 @@ body.light-theme {
    --card-border: rgba(0, 0, 0, 0.07);
    
    /* Petrol Accent Palette (high readability contrast) */
-   --accent-primary: #085A66;       
-   --accent-primary-hover: #053C45;
-   --accent-secondary: #0891B2;     
+   --accent-primary: #0A7382;       
+   --accent-primary-hover: #085A66;
+   --accent-secondary: #06B6D4;     
    --card-border-hover: rgba(10, 115, 130, 0.35);
    
    --text-primary: #1F2937;         /* High readability charcoal */

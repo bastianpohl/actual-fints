@@ -24,8 +24,9 @@ async function sendWebPush(title, message) {
       }
       
       const vapidKeys = JSON.parse(keysJson);
+      const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:bastian@pohl.info';
       webpush.setVapidDetails(
-         'mailto:admin@actual-fints.local',
+         vapidSubject,
          vapidKeys.publicKey,
          vapidKeys.privateKey
       );
