@@ -154,8 +154,31 @@ ${error?.message || error || 'Unbekannter Fehler'}`;
    }
 }
 
+/**
+ * Sends a warning notification when a transaction was matched/ignored with a mismatch (e.g. diffDays > 0).
+ * @param {Array} warnings
+ */
+async function sendWarningNotification(warnings) {
+   if (!warnings || !warnings.length) return;
+   const title = 'Achtung: Buchung ignoriert ⚠️';
+   const lines = ['Folgende Umsätze wurden ignoriert (mögliches Fehl-Match):', ''];
+   for (const w of warnings) {
+      lines.push(`💳 ${w.account}:`);
+      lines.push(`  • Bank-Umsatz: ${formatDate(w.bankDate)} | ${w.bankPayee}: ${formatAmount(w.amount)}`);
+      lines.push(`  • Match-Buchung: ${formatDate(w.matchDate)} | ${w.matchPayee}`);
+      lines.push(`  • Abstand: ${w.diffDays} Tage (Verdacht auf Fehl-Match)`);
+      lines.push('');
+   }
+   const message = lines.join('\n').trim();
+   try {
+      await sendWebPush(title, message);
+   } catch (error) {
+      console.error('Fehler bei der PWA Web-Push-Übertragung (Warning):', error.message);
+   }
+}
+
 module.exports = {
    sendSuccessNotification,
-   sendFailureNotification
+   sendFailureNotification,
+   sendWarningNotification
 };
-

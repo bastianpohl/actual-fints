@@ -7,7 +7,7 @@ const { CredentialsStore } = require('./lib/credentials-store');
 const { maskIban } = require('./utils/mask');
 
 const parseDateRange = require('./utils/parseDateRange');
-const { sendSuccessNotification, sendFailureNotification } = require('./utils/notifications');
+const { sendSuccessNotification, sendFailureNotification, sendWarningNotification } = require('./utils/notifications');
 
 const main = async () => {
 
@@ -120,6 +120,75 @@ const main = async () => {
                const added = importResult?.added?.length ?? 0;
                const updated = importResult?.updated?.length ?? 0;
 
+               // Detect mismatch warnings for ignored transactions
+               const warnings = [];
+               if (importResult?.updatedPreview) {
+                  const api = require('@actual-app/api');
+                  const ignoredList = importResult.updatedPreview.filter(p => p.ignored);
+                  for (const ignored of ignoredList) {
+                     const trans = ignored.transaction;
+                     
+                     // Skip if this transaction was already imported in a previous sync run
+                     if (existingIds.has(trans.imported_id)) {
+                        continue;
+                     }
+
+                     // It's a new bank transaction that was ignored during import!
+                     // Find the matching reconciled transaction in the database.
+                     const { q, runQuery } = api;
+                     const query = q('transactions')
+                        .filter({
+                           account: trans.account,
+                           amount: trans.amount,
+                           reconciled: true,
+                           imported_id: null
+                        })
+                        .select(['id', 'date', 'payee', 'notes']);
+                     
+                     const { data: candidates } = await runQuery(query);
+                     if (candidates && candidates.length > 0) {
+                        const targetDate = new Date(trans.date);
+                        const matches = candidates.filter(c => {
+                           const cDate = new Date(c.date);
+                           const diffTime = Math.abs(targetDate - cDate);
+                           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                           return diffDays <= 7;
+                        });
+                        
+                        if (matches.length > 0) {
+                           // Sort closest date first
+                           matches.sort((a, b) => Math.abs(targetDate - new Date(a.date)) - Math.abs(targetDate - new Date(b.date)));
+                           const bestMatch = matches[0];
+                           
+                           const diffTime = Math.abs(targetDate - new Date(bestMatch.date));
+                           const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                           
+                           // Query payee name
+                           let payeeName = 'Unbekannt';
+                           if (bestMatch.payee) {
+                              const payeeRow = await runQuery(q('payees').filter({ id: bestMatch.payee }).select('name'));
+                              payeeName = payeeRow?.data?.[0]?.name || bestMatch.payee;
+                           }
+                           
+                           if (diffDays === 0) {
+                              console.warn(`[Deduplizierungs-Info] Buchung über ${(Math.abs(trans.amount)/100).toFixed(2)} € am ${trans.date} (${trans.imported_payee}) wurde ignoriert: Es existiert bereits eine abgeglichene Buchung am selben Tag.`);
+                           } else {
+                              console.warn(`[WARNUNG - Fehl-Match erkannt] Buchung über ${(Math.abs(trans.amount)/100).toFixed(2)} € vom ${trans.date} (${trans.imported_payee}) wurde ignoriert! Sie wurde fälschlicherweise mit einer Buchung von vor ${diffDays} Tag(en) (${bestMatch.date} - ${payeeName}) abgeglichen.`);
+                              warnings.push({
+                                 account: accountMapping.actualAccountName,
+                                 amount: trans.amount,
+                                 bankDate: trans.date,
+                                 bankPayee: trans.imported_payee || 'Unbekannt',
+                                 matchDate: bestMatch.date,
+                                 matchPayee: payeeName,
+                                 diffDays
+                              });
+                           }
+                        }
+                     }
+                  }
+               }
+
                const txDetails = budgetTransactions.map(bt => {
                   const isExisting = existingIds.has(bt.imported_id);
                   return {
@@ -145,6 +214,14 @@ const main = async () => {
                      await sendSuccessNotification([accountResult]);
                   } catch (notificationErr) {
                      console.error('Fehler beim Senden der Erfolgsbenachrichtigung:', notificationErr.message);
+                  }
+               }
+
+               if (warnings.length > 0) {
+                  try {
+                     await sendWarningNotification(warnings);
+                  } catch (warningErr) {
+                     console.error('Fehler beim Senden der Warnungsbenachrichtigung:', warningErr.message);
                   }
                }
             }
