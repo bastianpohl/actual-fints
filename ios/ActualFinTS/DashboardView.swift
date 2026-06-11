@@ -12,7 +12,7 @@ struct DashboardView: View {
     @State private var syncError: String? = nil
     @State private var hasSynced = false
     
-    @State private var limitDateRange = false
+    @State private var limitDateRange = true
     @State private var startDate = Date()
     @State private var endDate = Date()
     
@@ -411,7 +411,7 @@ struct DashboardView: View {
                     .fontWeight(.medium)
                     .foregroundColor(.themeTextPrimary)
                     .lineLimit(1)
-                Text("\(tx.account) • \(tx.date)")
+                Text("\(tx.account) • \(formatDate(tx.date))")
                     .font(.caption)
                     .foregroundColor(.themeTextSecondary)
             }
@@ -507,11 +507,40 @@ struct DashboardView: View {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         guard let date = formatter.date(from: dateStr) ?? ISO8601DateFormatter().date(from: dateStr) else {
+            // Check if it's already in German format: "dd.MM.yyyy, HH:mm:ss" or similar
+            let deFormatter = DateFormatter()
+            deFormatter.locale = Locale(identifier: "de_DE")
+            deFormatter.dateFormat = "dd.M.yyyy, HH:mm:ss"
+            if let parsed = deFormatter.date(from: dateStr) {
+                let outFormatter = DateFormatter()
+                outFormatter.locale = Locale(identifier: "de_DE")
+                outFormatter.dateFormat = "dd.MM.yyyy, HH:mm"
+                return outFormatter.string(from: parsed)
+            }
+            deFormatter.dateFormat = "d.M.yyyy, HH:mm:ss"
+            if let parsed = deFormatter.date(from: dateStr) {
+                let outFormatter = DateFormatter()
+                outFormatter.locale = Locale(identifier: "de_DE")
+                outFormatter.dateFormat = "dd.MM.yyyy, HH:mm"
+                return outFormatter.string(from: parsed)
+            }
             return dateStr
         }
         let outputFormatter = DateFormatter()
-        outputFormatter.dateStyle = .medium
-        outputFormatter.timeStyle = .short
+        outputFormatter.locale = Locale(identifier: "de_DE")
+        outputFormatter.dateFormat = "dd.MM.yyyy, HH:mm"
+        return outputFormatter.string(from: date)
+    }
+    
+    private func formatDate(_ dateStr: String) -> String {
+        let inputFormatter = DateFormatter()
+        inputFormatter.locale = Locale(identifier: "en_US_POSIX")
+        inputFormatter.dateFormat = "yyyy-MM-dd"
+        guard let date = inputFormatter.date(from: dateStr) else { return dateStr }
+        
+        let outputFormatter = DateFormatter()
+        outputFormatter.locale = Locale(identifier: "de_DE")
+        outputFormatter.dateFormat = "dd.MM.yyyy"
         return outputFormatter.string(from: date)
     }
 }

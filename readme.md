@@ -16,6 +16,8 @@ This repository is split into two parts:
 - Duplicate detection through Actual Budget's `importTransactions` API
 - REST API to trigger imports via HTTP requests
 - **Interactive Web Dashboard (SPA)**: A beautiful mobile-optimized interface to sync transactions, view live logs, and manage accounts (with premium iOS native bottom-sheets and auto-zoom prevention)
+- **Native iOS App**: A 100% native SwiftUI client featuring dynamic themes, section-based bank configuration mapping, balance comparison, pending transactions drawer, custom haptic feedback, and a Siri Shortcut / App Intent integration for automated imports.
+- **Automated Reconciliation**: Automatically matches bank balances with Actual Budget balances and performs safe, lock-secured reconciliations.
 
 ## Dependencies
 
@@ -206,6 +208,8 @@ Dieses Repository ist in zwei Teile aufgeteilt:
 - REST-API zum Auslösen des Imports per HTTP-Request
 - DSGVO-konformes Logging (IBANs werden maskiert)
 - **Interaktives Web-Dashboard (SPA)**: Eine wunderschöne, für Smartphones und iOS Safari optimierte Weboberfläche zum Synchronisieren, Verwalten von Banken und Ansehen von Live-Logs (inkl. nativen Bottom-Sheets und Auto-Zoom-Schutz)
+- **Native iOS-App**: Ein 100% nativer SwiftUI-Client mit dynamischem Farbschema, sektionsbasierter Kontoverwaltung, Kontostandsvergleichen, Vorgemerkte-Umsätze-Drawer, haptischem Feedback und Siri-Kurzbefehlen (App Intents) für automatisierte Imports.
+- **Automatische Abstimmung (Reconciliation)**: Gleicht die tatsächlichen Banksalden automatisch mit den Kontoständen in Actual Budget ab und führt sichere, zugriffsgeschützte Kontenabstimmungen durch.
 
 ## Abhängigkeiten
 
@@ -374,3 +378,19 @@ node --test
 ├── credentials.db            # Verschlüsselte Zugangsdaten (nicht im Repo)
 └── .gitignore
 ```
+
+---
+
+## Development (Vibe Coding)
+
+This project is built and maintained utilizing the principles of **Vibe Coding**. The entire application — including the Express server backend, SPA web dashboard, SQLite-encrypted database, test suite, and the 100% native SwiftUI iOS application — was designed and written in a collaborative partnership with a highly autonomous agentic AI coding assistant. 
+
+Instead of manually editing files line-by-line, the human and AI pair program via high-level goals, automatic testing cycles, real-time log reviews, and visual feedback iterations. Development is conducted purely on high-level vibes, with the agent handling the heavy lifting of code generation and verification.
+
+---
+
+## Entwicklung (Vibe Coding)
+
+Dieses Projekt wurde nach den Prinzipien des **Vibe Codings** entwickelt und gepflegt. Die gesamte Anwendung – einschließlich des Express-Server-Backends, des Web-Dashboards, des SQLite-Credential-Stores, der Testsuite und der nativen SwiftUI-iOS-App – wurde in kooperativer Partnerschaft mit einem vollautonomen, agentenbasierten KI-Assistenten entwickelt.
+
+Statt Codezeilen manuell zu editieren, arbeiten Mensch und KI über übergeordnete Funktionsbeschreibungen, automatische Testzyklen, Echtzeit-Protokollanalysen und visuelle Feedbackschleifen zusammen. Die Entwicklung basiert auf reinem "Vibe Coding", bei dem der Agent die Hauptarbeit der Code-Generierung und Validierung übernimmt.

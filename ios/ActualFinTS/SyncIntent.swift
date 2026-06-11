@@ -186,7 +186,7 @@ private func triggerLocalNotification(title: String, body: String) {
 private func formatDate(_ dateStr: String) -> String {
     let parts = dateStr.split(separator: "-")
     if parts.count == 3 {
-        return "\(parts[2]).\(parts[1])."
+        return "\(parts[2]).\(parts[1]).\(parts[0])"
     }
     return dateStr
 }

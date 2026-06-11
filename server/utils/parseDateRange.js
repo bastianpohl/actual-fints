@@ -16,8 +16,7 @@ const parseDateRange = () => {
    const startDateStr = getArg('--start', '--from');
    const endDateStr = getArg('--end', '--to');
    
-   const defaultStartDate = new Date();
-   defaultStartDate.setDate(defaultStartDate.getDate() - 14); // Default to 14 days ago to capture recent/weekend/deleted transactions
+   const defaultStartDate = new Date(); // Default to today to capture only the current day's transactions
    
    const startDate = startDateStr ? new Date(startDateStr) : defaultStartDate;
    const endDate = endDateStr ? new Date(endDateStr) : new Date();

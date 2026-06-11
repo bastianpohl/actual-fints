@@ -161,7 +161,7 @@ struct LogRunRow: View {
                             .fontWeight(.semibold)
                             .foregroundColor(.primary)
                         
-                        Text("Zeitspanne: \(run.range)")
+                        Text("Zeitspanne: \(formatRange(run.range))")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -285,6 +285,37 @@ struct LogRunRow: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             showCopyToast = false
         }
+    }
+    
+    private func formatRange(_ rangeStr: String) -> String {
+        let parts = rangeStr.components(separatedBy: " to ")
+        if parts.count == 2 {
+            let startFormatted = formatDate(parts[0])
+            let endFormatted = formatDate(parts[1])
+            if startFormatted == "Heute" && endFormatted == "Heute" {
+                return "Heute"
+            }
+            if startFormatted == endFormatted {
+                return startFormatted
+            }
+            return "\(startFormatted) bis \(endFormatted)"
+        }
+        return formatDate(rangeStr)
+    }
+    
+    private func formatDate(_ dateStr: String) -> String {
+        if dateStr.lowercased() == "heute" {
+            return "Heute"
+        }
+        let inputFormatter = DateFormatter()
+        inputFormatter.locale = Locale(identifier: "en_US_POSIX")
+        inputFormatter.dateFormat = "yyyy-MM-dd"
+        guard let date = inputFormatter.date(from: dateStr) else { return dateStr }
+        
+        let outputFormatter = DateFormatter()
+        outputFormatter.locale = Locale(identifier: "de_DE")
+        outputFormatter.dateFormat = "dd.MM.yyyy"
+        return outputFormatter.string(from: date)
     }
 }
 

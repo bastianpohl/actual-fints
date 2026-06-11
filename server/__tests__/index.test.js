@@ -110,10 +110,9 @@ test('parseDateRange still honors legacy --start/--end flags', t => {
   assert.equal(endDate.toISOString(), new Date('2025-03-15').toISOString());
 });
 
-test('parseDateRange defaults to 14 days ago for start date when arguments are missing', t => {
+test('parseDateRange defaults to current day for start date when arguments are missing', t => {
   const defaultEndDate = new Date();
   const defaultStartDate = new Date();
-  defaultStartDate.setDate(defaultStartDate.getDate() - 14);
 
   const { startDate, endDate } = parseDateRange();
 
