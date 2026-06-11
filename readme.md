@@ -2,6 +2,12 @@
 
 Node.js application that fetches transactions from German bank accounts via **FinTS/HBCI** and automatically imports them into [Actual Budget](https://actualbudget.org).
 
+## Project Structure
+
+This repository is split into two parts:
+- `/server`: The Node.js Express server backend and static web dashboard SPA.
+- `/ios`: The native SwiftUI iOS application Xcode project.
+
 ## Features
 
 - Supports **multiple banks** with separate FinTS credentials
@@ -21,11 +27,13 @@ Node.js application that fetches transactions from German bank accounts via **Fi
 
 > **Note:** The `fints` package has not been updated in a while. Banks are currently migrating to the XML-based CAMT format — breaking changes are possible.
 
-## Installation
+## Installation & Setup
+
+All server-side commands should be run inside the `/server` directory:
 
 ```bash
 git clone <repo>
-cd actual-fints
+cd actual-fints/server
 npm install
 ```
 
@@ -183,6 +191,12 @@ node --test
 
 Node.js-Anwendung, die Transaktionen von deutschen Bankkonten via **FinTS/HBCI** abruft und automatisch in [Actual Budget](https://actualbudget.org) importiert.
 
+## Projektstruktur
+
+Dieses Repository ist in zwei Teile aufgeteilt:
+- `/server`: Der Node.js Express-Server (Backend) und das Web-Interface (Frontend).
+- `/ios`: Das native SwiftUI iOS-App Xcode-Projekt.
+
 ## Features
 
 - Unterstützt **mehrere Banken** mit separaten FinTS-Zugangsdaten
@@ -203,11 +217,13 @@ Node.js-Anwendung, die Transaktionen von deutschen Bankkonten via **FinTS/HBCI**
 
 > **Hinweis:** Das `fints`-Paket wurde zuletzt vor längerer Zeit aktualisiert. Banken migrieren aktuell auf das XML-basierte CAMT-Format – Breaking Changes sind möglich.
 
-## Installation
+## Installation & Setup
+
+Alle Server-Befehle müssen im Unterordner `/server` ausgeführt werden:
 
 ```bash
 git clone <repo>
-cd actual-fints
+cd actual-fints/server
 npm install
 ```
 

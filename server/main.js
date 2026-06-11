@@ -135,17 +135,21 @@ const main = async () => {
 
                      // It's a new bank transaction that was ignored during import!
                      // Find the matching reconciled transaction in the database.
-                     const { q, runQuery } = api;
-                     const query = q('transactions')
-                        .filter({
-                           account: trans.account,
-                           amount: trans.amount,
-                           reconciled: true,
-                           imported_id: null
-                        })
-                        .select(['id', 'date', 'payee', 'notes']);
-                     
-                     const { data: candidates } = await runQuery(query);
+                     const { getDatabasePath } = require('./utils/reconcile');
+                     const Database = require('better-sqlite3');
+                     const dbPath = getDatabasePath(actualConfig.dataDir);
+                     let candidates = [];
+                     if (dbPath) {
+                        const db = new Database(dbPath);
+                        try {
+                           candidates = db.prepare(`
+                              SELECT id, date, description AS payee, notes FROM transactions
+                              WHERE acct = ? AND amount = ? AND reconciled = 1 AND financial_id IS NULL AND tombstone = 0 AND isChild = 0
+                           `).all(trans.account, trans.amount);
+                        } finally {
+                           db.close();
+                        }
+                     }
                      if (candidates && candidates.length > 0) {
                         const targetDate = new Date(trans.date);
                         const matches = candidates.filter(c => {
@@ -224,6 +228,17 @@ const main = async () => {
                      console.error('Fehler beim Senden der Warnungsbenachrichtigung:', warningErr.message);
                   }
                }
+
+               // Trigger automatic reconciliation if account balance is synchronized and all transactions are categorized
+               try {
+                  const bal = await fintsClient.getBalance(matchedFintsAccount);
+                  const activeAccountId = budgetClient.getActiveAccountId();
+                  const { reconcileAccountIfSynchronized } = require('./utils/reconcile');
+                  
+                  await reconcileAccountIfSynchronized(activeAccountId, accountMapping.actualAccountName, bal.bookedBalance);
+               } catch (reconcileErr) {
+                  console.error(`[Reconciliation-Fehler] Automatische Abstimmung für "${accountMapping.actualAccountName}" fehlgeschlagen:`, reconcileErr.message);
+               }
             }
          } catch (err) {
             console.error('Fehler beim Verarbeiten von Konto', maskIban(accountMapping.iban), err.message);
@@ -232,6 +247,19 @@ const main = async () => {
    }
 
    await budgetClient.close();
+
+   const fs = require('node:fs');
+   const path = require('node:path');
+   const pendingCachePath = path.join(__dirname, 'pending-transactions.json');
+   if (fs.existsSync(pendingCachePath)) {
+      try {
+         fs.unlinkSync(pendingCachePath);
+         console.error('Deleted pending transactions cache because new booked transactions were synced.');
+      } catch (unlinkErr) {
+         console.error('Error deleting pending-transactions.json:', unlinkErr.message);
+      }
+   }
+
    return results;
 }
 

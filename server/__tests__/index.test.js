@@ -110,13 +110,15 @@ test('parseDateRange still honors legacy --start/--end flags', t => {
   assert.equal(endDate.toISOString(), new Date('2025-03-15').toISOString());
 });
 
-test('parseDateRange defaults to the current date when arguments are missing', t => {
-  const defaultDate = new Date();
+test('parseDateRange defaults to 14 days ago for start date when arguments are missing', t => {
+  const defaultEndDate = new Date();
+  const defaultStartDate = new Date();
+  defaultStartDate.setDate(defaultStartDate.getDate() - 14);
 
   const { startDate, endDate } = parseDateRange();
 
-  assert.equal(startDate.toISOString(), defaultDate.toISOString());
-  assert.equal(endDate.toISOString(), defaultDate.toISOString());
+  assert.equal(startDate.toISOString(), defaultStartDate.toISOString());
+  assert.equal(endDate.toISOString(), defaultEndDate.toISOString());
 });
 
 test('parseDateRange throws when end date precedes start date', t => {
@@ -179,6 +181,71 @@ test('requireEnv returns object with existing variables', () => {
     TEST_URL: 'http://localhost',
     TEST_PASS: 'secret',
   });
+});
+
+test('getAccountBalanceFromDb correctly sums only normal and parent transactions', () => {
+  const Database = require('better-sqlite3');
+  const fs = require('fs');
+  const path = require('path');
+  const { getAccountBalanceFromDb } = require('../utils/reconcile');
+
+  const tempDir = path.join(__dirname, 'temp-budget-test');
+  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+  const dbDir = path.join(tempDir, 'test-budget-id');
+  if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir);
+  const dbPath = path.join(dbDir, 'db.sqlite');
+
+  if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
+
+  const db = new Database(dbPath);
+  db.prepare(`
+    CREATE TABLE transactions (
+      id TEXT PRIMARY KEY,
+      acct TEXT,
+      amount INTEGER,
+      isParent INTEGER,
+      isChild INTEGER,
+      tombstone INTEGER
+    )
+  `).run();
+
+  const accountId = 'acc-123';
+
+  // 1. Normal transaction: 50.00 Euro (5000 cents)
+  db.prepare('INSERT INTO transactions (id, acct, amount, isParent, isChild, tombstone) VALUES (?, ?, ?, ?, ?, ?)').run(
+     'tx-1', accountId, 5000, 0, 0, 0
+  );
+
+  // 2. Deleted normal transaction (tombstone = 1): 10.00 Euro (1000 cents)
+  db.prepare('INSERT INTO transactions (id, acct, amount, isParent, isChild, tombstone) VALUES (?, ?, ?, ?, ?, ?)').run(
+     'tx-2', accountId, 1000, 0, 0, 1
+  );
+
+  // 3. Parent split transaction: 100.00 Euro (10000 cents)
+  db.prepare('INSERT INTO transactions (id, acct, amount, isParent, isChild, tombstone) VALUES (?, ?, ?, ?, ?, ?)').run(
+     'tx-parent-3', accountId, 10000, 1, 0, 0
+  );
+
+  // 4. Child split transactions (should be ignored to avoid double counting): 60.00 + 40.00 Euro
+  db.prepare('INSERT INTO transactions (id, acct, amount, isParent, isChild, tombstone) VALUES (?, ?, ?, ?, ?, ?)').run(
+     'tx-child-3a', accountId, 6000, 0, 1, 0
+  );
+  db.prepare('INSERT INTO transactions (id, acct, amount, isParent, isChild, tombstone) VALUES (?, ?, ?, ?, ?, ?)').run(
+     'tx-child-3b', accountId, 4000, 0, 1, 0
+  );
+
+  db.close();
+
+  // Call the function
+  const balance = getAccountBalanceFromDb(tempDir, accountId);
+
+  // Expected sum = 5000 (normal) + 10000 (parent) = 15000 cents = 150.00 Euro
+  assert.equal(balance, 150.00);
+
+  // Cleanup
+  fs.unlinkSync(dbPath);
+  fs.rmdirSync(dbDir);
+  fs.rmdirSync(tempDir);
 });
 
 

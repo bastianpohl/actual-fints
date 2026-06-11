@@ -6,8 +6,39 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const { CredentialsStore } = require('./lib/credentials-store');
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+// Safe monkey-patch for the fints library HISAL segment deserialization
+// to prevent "undefined is not iterable" crashes on banks that omit dispo/available fields.
+try {
+   const { HISAL } = require('fints/dist/segments/hisal');
+   const { Parse } = require('fints/dist/parse');
+   HISAL.prototype.deserialize = function(input) {
+      while (input.length < 7) {
+         input.push([]);
+      }
+      const [
+         [accountNumber, subAccount, _country, blz],
+         [productName],
+         [currency],
+         [_cb, booked],
+         [_cp, pending],
+         [dispo],
+         [available]
+      ] = input;
+      this.account = { accountNumber, subAccount, blz, iban: null, bic: null };
+      this.productName = productName;
+      this.currency = currency;
+      this.bookedBalance = booked ? Parse.num(booked) : 0.0;
+      this.pendingBalance = pending ? Parse.num(pending) : 0.0;
+      this.creditLimit = dispo ? Parse.num(dispo) : 0.0;
+      this.availableBalance = available ? Parse.num(available) : 0.0;
+   };
+} catch (patchErr) {
+   console.error("Failed to apply HISAL patch:", patchErr);
+}
+
 
 const app = express();
 app.use(express.json());
@@ -192,6 +223,15 @@ function getSessionCookie(req) {
 }
 
 function authMiddleware(req, res, next) {
+   // Support static API Key authentication (for Shortcuts / App Intents / third-party tools)
+   const authHeader = req.headers.authorization;
+   if (authHeader && process.env.API_KEY) {
+      if (authHeader === `Bearer ${process.env.API_KEY}`) {
+         req.session = { userId: 'api-key-user', username: 'api-key' };
+         return next();
+      }
+   }
+
    const masterKey = process.env.MASTER_KEY;
    if (!masterKey) {
       return res.status(500).json({ error: 'MASTER_KEY ist nicht konfiguriert.' });
@@ -1016,6 +1056,193 @@ app.get('/api/banks', (req, res) => {
    }
 });
 
+// GET /api/banks/balances - Fetch live account balances from all configured banks via FinTS
+app.get('/api/banks/balances', async (req, res) => {
+   const masterKey = process.env.MASTER_KEY;
+   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht gesetzt.' });
+
+   const { actualApiLock } = require('./utils/lock');
+   const release = await actualApiLock.acquire();
+
+   let store;
+   let budgetClient = null;
+   try {
+      store = new CredentialsStore(masterKey);
+      const banks = store.getAllBanks();
+      
+      // Fetch current balances from Actual Budget for comparison
+      const actualConfig = {
+         serverUrl: store.getConfig('actual_server_url') || process.env.AB_URL,
+         password: store.getEncryptedConfig('actual_password') || process.env.AB_PASS,
+         syncDb: store.getConfig('actual_sync_db') || process.env.AB_SYNC_DB,
+         dataDir: store.getConfig('actual_data_dir') || process.env.AB_PATH || './actual-budget/'
+      };
+
+      const actualBalances = {};
+      if (actualConfig.serverUrl && actualConfig.password && actualConfig.syncDb) {
+         try {
+            const { BudgetClient } = require('./lib/budget-api');
+            const { getAccountBalanceFromDb } = require('./utils/reconcile');
+            budgetClient = new BudgetClient(actualConfig);
+            await budgetClient.loadBudget();
+            const api = require('@actual-app/api');
+            const abAccounts = await api.getAccounts();
+            
+            for (const acc of abAccounts) {
+               const balance = getAccountBalanceFromDb(actualConfig.dataDir, acc.id);
+               actualBalances[acc.name] = balance !== null ? balance : 0.0;
+            }
+         } catch (budgetErr) {
+            console.error('Fehler beim Laden der Actual Budget Salden:', budgetErr);
+         }
+      }
+      
+      const balances = [];
+      const errors = [];
+
+      const pendingCachePath = path.join(__dirname, 'pending-transactions.json');
+      let allPendingTransactions = {};
+      if (fs.existsSync(pendingCachePath)) {
+         try {
+            allPendingTransactions = JSON.parse(fs.readFileSync(pendingCachePath, 'utf8'));
+         } catch (readErr) {
+            console.error(`Fehler beim Lesen des vorgemerkten Umsätze Cache:`, readErr);
+         }
+      }
+
+      for (const bank of banks) {
+         const { FinTSClient } = require('./lib/fints-api');
+         try {
+            const client = new FinTSClient({
+               url: bank.fints.url,
+               blz: bank.fints.blz,
+               login: bank.fints.login,
+               pin: bank.fints.pin
+            });
+            await client.initiateClient();
+            await client.loadAccounts();
+            
+            const accounts = client.getAccounts();
+            const mappedIbans = (bank.accounts || []).map(a => a.iban.toUpperCase().replace(/\s+/g, ''));
+            const accountsToQuery = accounts.filter(acc => {
+               if (!acc.iban) return false;
+               return mappedIbans.includes(acc.iban.toUpperCase().replace(/\s+/g, ''));
+            });
+
+            for (const acc of accountsToQuery) {
+               try {
+                  const bal = await client.getBalance(acc);
+                  
+                  let pendingTx = [];
+                  let fetchedPendingOk = false;
+                  try {
+                     const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+                     const toDate = new Date();
+                     client.setAccount(acc.iban);
+                     pendingTx = await client.getPendingTransactions(fromDate, toDate);
+                     fetchedPendingOk = true;
+                  } catch (pendingErr) {
+                     console.error(`Fehler beim Laden der vorgemerkten Umsätze für ${acc.iban}:`, pendingErr);
+                     if (allPendingTransactions[acc.iban]) {
+                        pendingTx = allPendingTransactions[acc.iban];
+                     }
+                  }
+
+                  if (fetchedPendingOk) {
+                     allPendingTransactions[acc.iban] = pendingTx || [];
+                  }
+
+                  let calculatedPendingBalance = 0.0;
+                  const mappedPending = [];
+                  if (pendingTx && pendingTx.length > 0) {
+                     for (const tx of pendingTx) {
+                        const amount = Number(tx.amount);
+                        const sign = tx.isCredit ? 1.0 : -1.0;
+                        calculatedPendingBalance += amount * sign;
+
+                        mappedPending.push({
+                           id: tx.id,
+                           amount: amount,
+                           isCredit: tx.isCredit,
+                           valueDate: tx.valueDate,
+                           entryDate: tx.entryDate || null,
+                           payee: tx.descriptionStructured?.name || 'Unbekannt',
+                           purpose: tx.descriptionStructured?.reference?.text || tx.description || ''
+                        });
+                     }
+                  }
+
+                  const mappedAcc = bank.accounts.find(a => a.iban.toUpperCase().replace(/\s+/g, '') === acc.iban.toUpperCase().replace(/\s+/g, ''));
+                  const displayName = mappedAcc ? mappedAcc.actualAccountName : (acc.accountName || acc.iban);
+                  
+                  // Trigger automatic reconciliation if account balance is synchronized and all transactions are categorized
+                  if (mappedAcc && budgetClient) {
+                     try {
+                        const { reconcileAccountIfSynchronized } = require('./utils/reconcile');
+                        const api = require('@actual-app/api');
+                        const activeAccountId = await api.getIDByName('accounts', displayName);
+                        if (activeAccountId) {
+                           await reconcileAccountIfSynchronized(activeAccountId, displayName, bal.bookedBalance);
+                        }
+                     } catch (recErr) {
+                        console.error(`[Reconciliation-Fehler] Automatische Abstimmung für "${displayName}" fehlgeschlagen:`, recErr.message);
+                     }
+                  }
+                  
+                  const actualBal = actualBalances[displayName] !== undefined ? actualBalances[displayName] : null;
+                  
+                  balances.push({
+                     iban: acc.iban,
+                     name: displayName,
+                     productName: bal.productName || null,
+                     balance: bal.bookedBalance,
+                     actualBalance: actualBal,
+                     pendingBalance: calculatedPendingBalance,
+                     pendingTransactions: mappedPending,
+                     currency: bal.currency || 'EUR',
+                     bankName: bank.name,
+                     lastUpdated: new Date().toISOString()
+                  });
+               } catch (balanceErr) {
+                  console.error(`Fehler beim Laden des Kontostands für ${acc.iban} von Bank ${bank.name}:`, balanceErr);
+                  errors.push({
+                     bankName: bank.name,
+                     error: `Konto ${acc.iban}: ${balanceErr.message}`
+                  });
+               }
+            }
+         } catch (bankErr) {
+            console.error(`Fehler bei Bankverbindung für ${bank.name}:`, bankErr);
+            errors.push({
+               bankName: bank.name,
+               error: bankErr.message
+            });
+         }
+      }
+
+      try {
+         fs.writeFileSync(pendingCachePath, JSON.stringify(allPendingTransactions, null, 2), 'utf8');
+         console.log(`Vorgemerkte Umsätze erfolgreich unter ${pendingCachePath} gespeichert.`);
+      } catch (writeErr) {
+         console.error(`Fehler beim Schreiben der vorgemerkten Umsätze cache:`, writeErr);
+      }
+
+      return res.json({ success: true, balances, errors });
+   } catch (err) {
+      return res.status(500).json({ error: err.message });
+   } finally {
+      if (store) store.close();
+      if (budgetClient) {
+         try {
+            await budgetClient.close();
+         } catch (closeErr) {
+            console.error('Fehler beim Schließen des Budget-Clients:', closeErr);
+         }
+      }
+      release();
+   }
+});
+
 // POST /api/banks - Add a new bank configuration
 app.post('/api/banks', (req, res) => {
    const masterKey = process.env.MASTER_KEY;
@@ -1191,58 +1418,65 @@ app.get('/api/budget/accounts', async (req, res) => {
    const masterKey = process.env.MASTER_KEY;
    if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht gesetzt.' });
 
+   const { actualApiLock } = require('./utils/lock');
+   const release = await actualApiLock.acquire();
+
    let store;
    let url = '';
    let syncDb = '';
    let password = '';
    try {
-      store = new CredentialsStore(masterKey);
-      url = store.getConfig('actual_server_url') || '';
-      syncDb = store.getConfig('actual_sync_db') || '';
-      password = store.getEncryptedConfig('actual_password') || '';
-
-      // Fallback to process.env variables if database entries are not yet populated
-      if (!url && !syncDb && !password) {
-         url = process.env.AB_URL || '';
-         syncDb = process.env.AB_SYNC_DB || '';
-         password = process.env.AB_PASS || '';
-      }
-   } catch (err) {
-      return res.status(500).json({ error: 'Fehler beim Laden der Budget-Konfiguration: ' + err.message });
-   } finally {
-      if (store) store.close();
-   }
-
-   if (!url || !syncDb || !password) {
-      return res.status(400).json({ error: 'Actual Budget ist nicht oder unvollständig konfiguriert.' });
-   }
-
-   const { BudgetClient } = require('./lib/budget-api');
-   const client = new BudgetClient({
-      serverUrl: url.trim(),
-      syncDb: syncDb.trim(),
-      password: password.trim(),
-   });
-
-   try {
-      await client.loadBudget();
-      const accounts = await client.getAccounts() || [];
-      // We only return open accounts that can hold transactions
-      const mapped = accounts.map(acc => ({
-         id: acc.id,
-         name: acc.name,
-         offbudget: acc.offbudget,
-         closed: acc.closed
-      }));
-      return res.json({ success: true, accounts: mapped });
-   } catch (err) {
-      return res.status(400).json({ error: 'Verbindung zu Actual Budget fehlgeschlagen: ' + err.message });
-   } finally {
       try {
-         await client.close();
-      } catch (closeErr) {
-         console.error('Fehler beim Schließen des Budget-Clients:', closeErr);
+         store = new CredentialsStore(masterKey);
+         url = store.getConfig('actual_server_url') || '';
+         syncDb = store.getConfig('actual_sync_db') || '';
+         password = store.getEncryptedConfig('actual_password') || '';
+
+         // Fallback to process.env variables if database entries are not yet populated
+         if (!url && !syncDb && !password) {
+            url = process.env.AB_URL || '';
+            syncDb = process.env.AB_SYNC_DB || '';
+            password = process.env.AB_PASS || '';
+         }
+      } catch (err) {
+         return res.status(500).json({ error: 'Fehler beim Laden der Budget-Konfiguration: ' + err.message });
+      } finally {
+         if (store) store.close();
       }
+
+      if (!url || !syncDb || !password) {
+         return res.status(400).json({ error: 'Actual Budget ist nicht oder unvollständig konfiguriert.' });
+      }
+
+      const { BudgetClient } = require('./lib/budget-api');
+      const client = new BudgetClient({
+         serverUrl: url.trim(),
+         syncDb: syncDb.trim(),
+         password: password.trim(),
+      });
+
+      try {
+         await client.loadBudget();
+         const accounts = await client.getAccounts() || [];
+         // We only return open accounts that can hold transactions
+         const mapped = accounts.map(acc => ({
+            id: acc.id,
+            name: acc.name,
+            offbudget: acc.offbudget,
+            closed: acc.closed
+         }));
+         return res.json({ success: true, accounts: mapped });
+      } catch (err) {
+         return res.status(400).json({ error: 'Verbindung zu Actual Budget fehlgeschlagen: ' + err.message });
+      } finally {
+         try {
+            await client.close();
+         } catch (closeErr) {
+            console.error('Fehler beim Schließen des Budget-Clients:', closeErr);
+         }
+      }
+   } finally {
+      release();
    }
 });
 
@@ -1251,45 +1485,53 @@ app.post('/api/budget/test', async (req, res) => {
    const masterKey = process.env.MASTER_KEY;
    if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht gesetzt.' });
 
+   const { actualApiLock } = require('./utils/lock');
+   const release = await actualApiLock.acquire();
+
    let { url, syncDb, password } = req.body ?? {};
    if (!url || !syncDb) {
+      release();
       return res.status(400).json({ error: 'Server URL und Budget Sync ID sind erforderlich.' });
    }
 
    let store;
    try {
-      if (!password || password === '●●●●●●●●') {
-         store = new CredentialsStore(masterKey);
-         password = store.getEncryptedConfig('actual_password');
-      }
-   } catch (err) {
-      return res.status(500).json({ error: 'Fehler beim Laden des gespeicherten Passworts: ' + err.message });
-   } finally {
-      if (store) store.close();
-   }
-
-   if (!password) {
-      return res.status(400).json({ error: 'Passwort ist erforderlich.' });
-   }
-
-   const { BudgetClient } = require('./lib/budget-api');
-   const client = new BudgetClient({
-      serverUrl: url.trim(),
-      syncDb: syncDb.trim(),
-      password: password.trim(),
-   });
-
-   try {
-      await client.loadBudget();
-      return res.json({ success: true });
-   } catch (err) {
-      return res.status(400).json({ error: err.message });
-   } finally {
       try {
-         await client.close();
-      } catch (closeErr) {
-         console.error('Fehler beim Schließen des Budget-Clients:', closeErr);
+         if (!password || password === '●●●●●●●●') {
+            store = new CredentialsStore(masterKey);
+            password = store.getEncryptedConfig('actual_password');
+         }
+      } catch (err) {
+         return res.status(500).json({ error: 'Fehler beim Laden des gespeicherten Passworts: ' + err.message });
+      } finally {
+         if (store) store.close();
       }
+
+      if (!password) {
+         return res.status(400).json({ error: 'Passwort ist erforderlich.' });
+      }
+
+      const { BudgetClient } = require('./lib/budget-api');
+      const client = new BudgetClient({
+         serverUrl: url.trim(),
+         syncDb: syncDb.trim(),
+         password: password.trim(),
+      });
+
+      try {
+         await client.loadBudget();
+         return res.json({ success: true });
+      } catch (err) {
+         return res.status(400).json({ error: err.message });
+      } finally {
+         try {
+            await client.close();
+         } catch (closeErr) {
+            console.error('Fehler beim Schließen des Budget-Clients:', closeErr);
+         }
+      }
+   } finally {
+      release();
    }
 });
 
@@ -1346,7 +1588,7 @@ app.post('/api/banks/test', async (req, res) => {
 
 // ── Main Execution Endpoints ────────────────────────────────────────
 
-app.post('/api/transactions/load', (req, res) => {
+app.post('/api/transactions/load', async (req, res) => {
    const { start, end } = req.body ?? {};
 
    if (start && !DATE_REGEX.test(start)) {
@@ -1356,54 +1598,82 @@ app.post('/api/transactions/load', (req, res) => {
       return res.status(400).json({ error: 'Ungültiges Enddatum-Format. Erwartet wird YYYY-MM-DD.' });
    }
 
-   console.log(`Loading transactions from ${start} to ${end}...`);
+   const { actualApiLock } = require('./utils/lock');
+   const release = await actualApiLock.acquire();
 
-   const child = spawn('node', ['main.js', '--start', start, '--end', end], { stdio: 'pipe' });
-   let output = '';
-   let errorOutput = '';
+   console.log(`Loading transactions from ${start || 'default'} to ${end || 'default'}...`);
 
-   child.stdout.on('data', (chunk) => (output += chunk));
-   child.stderr.on('data', (chunk) => (errorOutput += chunk));
+   const args = [path.join(__dirname, 'main.js')];
+   if (start) {
+      args.push('--start', start);
+   }
+   if (end) {
+      args.push('--end', end);
+   }
 
-   child.on('close', (code) => {
-      const timestamp = new Date().toLocaleString('de-DE');
-      const logContent = `\n[${timestamp}] --- SYNC START (Range: ${start || 'Heute'} to ${end || 'Heute'}) ---\nSTDOUT:\n${output.trim()}\nSTDERR:\n${errorOutput.trim()}\n--- SYNC END ---\n`;
-      try {
-         fs.appendFileSync(LOG_FILE, logContent, 'utf8');
-         // Keep log file under 50KB to prevent endless growth
-         const stats = fs.statSync(LOG_FILE);
-         if (stats.size > 50 * 1024) {
-            const data = fs.readFileSync(LOG_FILE, 'utf8');
-            const trimmed = data.substring(data.length - 30 * 1024); // Keep last 30KB
-            fs.writeFileSync(LOG_FILE, trimmed, 'utf8');
-         }
-      } catch (e) {
-         console.error("Error writing sync.log:", e);
-      }
+   try {
+      const child = spawn('node', args, { stdio: 'pipe' });
+      let output = '';
+      let errorOutput = '';
 
-      if (code === 0) {
-         let results = [];
+      child.stdout.on('data', (chunk) => (output += chunk));
+      child.stderr.on('data', (chunk) => (errorOutput += chunk));
+
+      child.on('close', (code) => {
+         release();
+
+         const timestamp = new Date().toLocaleString('de-DE');
+         const logContent = `\n[${timestamp}] --- SYNC START (Range: ${start || 'Heute'} to ${end || 'Heute'}) ---\nSTDOUT:\n${output.trim()}\nSTDERR:\n${errorOutput.trim()}\n--- SYNC END ---\n`;
          try {
-            const lines = output.trim().split('\n');
-            for (let i = lines.length - 1; i >= 0; i--) {
-               const line = lines[i].trim();
-               if (line.startsWith('[') && line.endsWith(']')) {
-                  results = JSON.parse(line);
-                  break;
-               }
+            fs.appendFileSync(LOG_FILE, logContent, 'utf8');
+            // Keep log file under 50KB to prevent endless growth
+            const stats = fs.statSync(LOG_FILE);
+            if (stats.size > 50 * 1024) {
+               const data = fs.readFileSync(LOG_FILE, 'utf8');
+               const trimmed = data.substring(data.length - 30 * 1024); // Keep last 30KB
+               fs.writeFileSync(LOG_FILE, trimmed, 'utf8');
             }
          } catch (e) {
-            console.error("Failed to parse main.js stdout JSON results:", e);
+            console.error("Error writing sync.log:", e);
          }
-         return res.json({ success: true, results, output: output.trim() });
-      }
-      return res.status(500).json({ success: false, error: errorOutput.trim() || 'main.js failed' });
-   });
+
+         if (code === 0) {
+            const pendingCachePath = path.join(__dirname, 'pending-transactions.json');
+            if (fs.existsSync(pendingCachePath)) {
+               try {
+                  fs.unlinkSync(pendingCachePath);
+                  console.log(`Deleted pending transactions cache ${pendingCachePath} due to successful transaction sync.`);
+               } catch (unlinkErr) {
+                  console.error(`Fehler beim Löschen der vorgemerkten Umsätze:`, unlinkErr);
+               }
+            }
+
+            let results = [];
+            try {
+               const lines = output.trim().split('\n');
+               for (let i = lines.length - 1; i >= 0; i--) {
+                  const line = lines[i].trim();
+                  if (line.startsWith('[') && line.endsWith(']')) {
+                     results = JSON.parse(line);
+                     break;
+                  }
+               }
+            } catch (e) {
+               console.error("Failed to parse main.js stdout JSON results:", e);
+            }
+            return res.json({ success: true, results, output: output.trim() });
+         }
+         return res.status(500).json({ success: false, error: errorOutput.trim() || 'main.js failed' });
+      });
+   } catch (err) {
+      release();
+      return res.status(500).json({ success: false, error: err.message });
+   }
 });
 
 app.put('/api/update/config', async (req, res) => {
    try {
-      const pullResult = await runCommand('git', ['pull', '--ff-only']);
+      const pullResult = await runCommand('git', ['pull', '--ff-only'], { cwd: path.join(__dirname, '..') });
       if (pullResult.code !== 0) {
          throw new Error(pullResult.stderr || pullResult.stdout || 'git pull failed');
       }

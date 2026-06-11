@@ -94,12 +94,20 @@ class BudgetClient {
       await this.#initClient();
       if (!this.#activeAccount) throw new Error("No active account id set");
       try {
-         const { q, runQuery } = api;
-         const query = q('transactions')
-            .filter({ account: this.#activeAccount })
-            .select(['imported_id']);
-         const { data: existingTx } = await runQuery(query);
-         return new Set((existingTx || []).map(t => t.imported_id).filter(Boolean));
+         const { getDatabasePath } = require('../utils/reconcile');
+         const Database = require('better-sqlite3');
+         const dbPath = getDatabasePath(this.#AB_PATH);
+         if (!dbPath) {
+            console.warn(`[budget-api] DB-Pfad konnte nicht ermittelt werden.`);
+            return new Set();
+         }
+         const db = new Database(dbPath);
+         try {
+            const rows = db.prepare('SELECT financial_id FROM transactions WHERE acct = ? AND financial_id IS NOT NULL AND tombstone = 0').all(this.#activeAccount);
+            return new Set(rows.map(r => r.financial_id));
+         } finally {
+            db.close();
+         }
       } catch (error) {
          console.warn(`Failed to fetch existing transactions: ${error.message}`);
          return new Set();
