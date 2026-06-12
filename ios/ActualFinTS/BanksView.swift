@@ -9,6 +9,11 @@ struct ListRowButtonStyle: ButtonStyle {
     }
 }
 
+struct BankEditorItem: Identifiable {
+    let id = UUID()
+    let bank: BankConfig?
+}
+
 struct BanksView: View {
     @ObservedObject var networkManager = NetworkManager.shared
     
@@ -16,8 +21,7 @@ struct BanksView: View {
     @State private var isLoading = false
     @State private var errorMessage: String? = nil
     
-    @State private var selectedBank: BankConfig? = nil
-    @State private var isShowingEditor = false
+    @State private var activeEditorItem: BankEditorItem? = nil
     
     // Deletion confirmation
     @State private var bankToDelete: BankConfig? = nil
@@ -67,8 +71,7 @@ struct BanksView: View {
                         
                         Button(action: {
                             triggerSelectionHaptic()
-                            selectedBank = nil
-                            isShowingEditor = true
+                            activeEditorItem = BankEditorItem(bank: nil)
                         }) {
                             Text("Bank hinzufügen")
                                 .fontWeight(.bold)
@@ -129,8 +132,7 @@ struct BanksView: View {
                                 
                                 Button(action: {
                                     triggerSelectionHaptic()
-                                    selectedBank = bank
-                                    isShowingEditor = true
+                                    activeEditorItem = BankEditorItem(bank: bank)
                                 }) {
                                     HStack {
                                         Label("Verbindung verwalten", systemImage: "slider.horizontal.3")
@@ -155,8 +157,8 @@ struct BanksView: View {
                                 }
                                 .contextMenu {
                                     Button {
-                                        selectedBank = bank
-                                        isShowingEditor = true
+                                        triggerSelectionHaptic()
+                                        activeEditorItem = BankEditorItem(bank: bank)
                                     } label: {
                                         Label("Bearbeiten", systemImage: "pencil")
                                     }
@@ -188,8 +190,7 @@ struct BanksView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
                         triggerSelectionHaptic()
-                        selectedBank = nil
-                        isShowingEditor = true
+                        activeEditorItem = BankEditorItem(bank: nil)
                     }) {
                         Image(systemName: "plus")
                     }
@@ -206,10 +207,10 @@ struct BanksView: View {
                     await loadBanks()
                 }
             }
-            .sheet(isPresented: $isShowingEditor, onDismiss: {
+            .sheet(item: $activeEditorItem, onDismiss: {
                 Task { await loadBanks() }
-            }) {
-                BankEditorView(bank: selectedBank)
+            }) { item in
+                BankEditorView(bank: item.bank)
             }
             .confirmationDialog(
                 "Bankverbindung löschen?",
