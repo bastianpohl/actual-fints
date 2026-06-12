@@ -238,6 +238,9 @@ struct BankEditorView: View {
                 }
             }
             .onAppear {
+                if let cached: [ActualAccount] = LocalCacheManager.shared.load(from: "budget_accounts.json") {
+                    self.budgetAccounts = cached
+                }
                 Task {
                     await loadActualAccounts()
                 }
@@ -259,7 +262,9 @@ struct BankEditorView: View {
     
     private func loadActualAccounts() async {
         do {
-            budgetAccounts = try await networkManager.fetchBudgetAccounts()
+            let fetched = try await networkManager.fetchBudgetAccounts()
+            self.budgetAccounts = fetched
+            LocalCacheManager.shared.save(fetched, to: "budget_accounts.json")
         } catch {
             print("Failed to fetch budget accounts: \(error)")
         }
