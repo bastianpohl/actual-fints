@@ -23,19 +23,19 @@
 
 /* Begin PBXFileReference section */
 		9594940261A54F74A039F010 /* ActualFinTS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ActualFinTS.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		9594940261A54F74A039F011 /* ActualFinTSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActualFinTSApp.swift; sourceTree = "<group>"; };
-		9594940261A54F74A039F012 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		9594940261A54F74A039F013 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		9594940261A54F74A039F015 /* SyncIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncIntent.swift; sourceTree = "<group>"; };
-		9594940261A54F74A039F016 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		9594940261A54F74A039F011 /* ActualFinTSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/ActualFinTSApp.swift; sourceTree = "<group>"; };
+		9594940261A54F74A039F012 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/ContentView.swift; sourceTree = "<group>"; };
+		9594940261A54F74A039F013 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Settings/SettingsView.swift; sourceTree = "<group>"; };
+		9594940261A54F74A039F015 /* SyncIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Intents/SyncIntent.swift; sourceTree = "<group>"; };
+		9594940261A54F74A039F016 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = App/Info.plist; sourceTree = "<group>"; };
 		9594940261A54F74A039F091 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		9594940261A54F74A039F1A1 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
-		9594940261A54F74A039F1A2 /* NetworkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkManager.swift; sourceTree = "<group>"; };
-		9594940261A54F74A039F1A3 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
-		9594940261A54F74A039F1A4 /* BanksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BanksView.swift; sourceTree = "<group>"; };
-		9594940261A54F74A039F1A5 /* BankEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BankEditorView.swift; sourceTree = "<group>"; };
-		9594940261A54F74A039F1A6 /* LogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogsView.swift; sourceTree = "<group>"; };
-		9594940261A54F74A039F701 /* LocalCacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalCacheManager.swift; sourceTree = "<group>"; };
+		9594940261A54F74A039F1A1 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/Models.swift; sourceTree = "<group>"; };
+		9594940261A54F74A039F1A2 /* NetworkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Networking/NetworkManager.swift; sourceTree = "<group>"; };
+		9594940261A54F74A039F1A3 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Dashboard/DashboardView.swift; sourceTree = "<group>"; };
+		9594940261A54F74A039F1A4 /* BanksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Banks/BanksView.swift; sourceTree = "<group>"; };
+		9594940261A54F74A039F1A5 /* BankEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Banks/BankEditorView.swift; sourceTree = "<group>"; };
+		9594940261A54F74A039F1A6 /* LogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Logs/LogsView.swift; sourceTree = "<group>"; };
+		9594940261A54F74A039F701 /* LocalCacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Networking/LocalCacheManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -306,7 +306,7 @@
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = L622R6R9M6;
 				ENABLE_PREVIEWS = YES;
-				INFOPLIST_FILE = ActualFinTS/Info.plist;
+				INFOPLIST_FILE = ActualFinTS/App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -331,7 +331,7 @@
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = L622R6R9M6;
 				ENABLE_PREVIEWS = YES;
-				INFOPLIST_FILE = ActualFinTS/Info.plist;
+				INFOPLIST_FILE = ActualFinTS/App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = "$(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET)";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
