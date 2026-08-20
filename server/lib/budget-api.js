@@ -7,6 +7,7 @@ if (typeof globalThis.navigator === 'undefined') {
 const api = require('@actual-app/api');
 const { isUid } = require('../utils/uid');
 const { convertTransaction, convertPendingTransaction, PENDING_ID_PREFIX } = require('../utils/convert');
+const { selectObsoletePendingImports } = require('../utils/pending');
 const { requireEnv } = require('../utils/env');
 
 class BudgetClient {
@@ -176,41 +177,57 @@ class BudgetClient {
    }
 
    /**
-    * Removes every uncleared transaction of the active account that was created by a
-    * previous pending import (imported_id prefixed with "pending-"). Manually entered
-    * uncleared transactions are left untouched.
+    * Returns the transactions of the active account that were created by a previous
+    * pending import (imported_id prefixed with "pending-").
     *
-    * @returns {Promise<number>} Number of deleted transactions.
+    * @returns {Promise<Array<{id: string, imported_id: string}>>}
     */
-   async deletePendingImports() {
+   async getPendingImports() {
       await this.#initClient();
       if (!this.#activeAccount) throw new Error("No active account id set");
 
-      let rows = [];
       const db = this.#openDatabase();
-      if (!db) return 0;
+      if (!db) return [];
       try {
-         rows = db.prepare(`
-            SELECT id FROM transactions
+         const rows = db.prepare(`
+            SELECT id, financial_id FROM transactions
             WHERE acct = ?
               AND tombstone = 0
               AND isChild = 0
               AND financial_id LIKE ?
          `).all(this.#activeAccount, `${PENDING_ID_PREFIX}%`);
+         return rows.map(row => ({ id: row.id, imported_id: row.financial_id }));
+      } catch (error) {
+         console.warn(`[budget-api] Vorgemerkte Buchungen konnten nicht gelesen werden: ${error.message}`);
+         return [];
       } finally {
          db.close();
       }
+   }
 
-      let deleted = 0;
-      for (const row of rows) {
+   /**
+    * Removes the previously imported pending transactions that the bank no longer reports
+    * as pending. Transactions that are still pending keep their id - and with it any
+    * category, payee or note the user assigned in Actual Budget. Manually entered
+    * uncleared transactions are never touched.
+    *
+    * @param {Set<string>|Array<string>} stillPendingIds imported_ids that are still pending.
+    * @returns {Promise<{removed: number, kept: number}>}
+    */
+   async deleteObsoletePendingImports(stillPendingIds) {
+      const existing = await this.getPendingImports();
+      const obsolete = selectObsoletePendingImports(existing, stillPendingIds);
+
+      let removed = 0;
+      for (const row of obsolete) {
          try {
             await api.deleteTransaction(row.id);
-            deleted++;
+            removed++;
          } catch (error) {
             console.warn(`[budget-api] Vorgemerkte Buchung ${row.id} konnte nicht gelöscht werden: ${error.message}`);
          }
       }
-      return deleted;
+      return { removed, kept: existing.length - removed };
    }
 
    /**

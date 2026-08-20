@@ -4,7 +4,7 @@ const assert = require('assert/strict');
 const { decodeText } = require('../utils/decodeText');
 const { isUid } = require('../utils/uid')
 const { convertAmount, getNotes, getPayeeName, convertTransaction, convertPendingTransaction, PENDING_ID_PREFIX } = require ('../utils/convert');
-const { splitAlreadyBookedPending, dateIntToIso, payeesMatch } = require('../utils/pending');
+const { splitAlreadyBookedPending, selectObsoletePendingImports, dateIntToIso, payeesMatch } = require('../utils/pending');
 const { requireEnv } = require('../utils/env');
 const parseDateRange = require('../utils/parseDateRange');
 
@@ -344,4 +344,37 @@ test('splitAlreadyBookedPending consumes each booked transaction only once', () 
 
   assert.equal(duplicates.length, 1);
   assert.equal(fresh.length, 1);
+});
+
+
+test('selectObsoletePendingImports keeps bookings the bank still reports as pending', () => {
+  const existing = [
+    { id: 'tx-a', imported_id: 'pending-aaa' },
+    { id: 'tx-b', imported_id: 'pending-bbb' },
+    { id: 'tx-c', imported_id: 'pending-ccc' },
+  ];
+
+  const obsolete = selectObsoletePendingImports(existing, new Set(['pending-aaa', 'pending-ccc']));
+
+  assert.equal(obsolete.length, 1);
+  assert.equal(obsolete[0].id, 'tx-b');
+});
+
+test('selectObsoletePendingImports removes everything when nothing is pending anymore', () => {
+  const existing = [{ id: 'tx-a', imported_id: 'pending-aaa' }];
+
+  assert.equal(selectObsoletePendingImports(existing, new Set()).length, 1);
+  assert.equal(selectObsoletePendingImports([], new Set(['pending-aaa'])).length, 0);
+});
+
+test('selectObsoletePendingImports accepts an array of ids', () => {
+  const existing = [
+    { id: 'tx-a', imported_id: 'pending-aaa' },
+    { id: 'tx-b', imported_id: 'pending-bbb' },
+  ];
+
+  const obsolete = selectObsoletePendingImports(existing, ['pending-bbb']);
+
+  assert.equal(obsolete.length, 1);
+  assert.equal(obsolete[0].imported_id, 'pending-aaa');
 });

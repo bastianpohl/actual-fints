@@ -18,7 +18,7 @@ This repository is split into two parts:
 - **Interactive Web Dashboard (SPA)**: A beautiful mobile-optimized interface to sync transactions, view live logs, and manage accounts (with premium iOS native bottom-sheets and auto-zoom prevention)
 - **Native iOS App**: A 100% native SwiftUI client featuring dynamic themes, section-based bank configuration mapping, balance comparison, pending transactions drawer, custom haptic feedback, and a Siri Shortcut / App Intent integration for automated imports.
 - **Automated Reconciliation**: Automatically matches bank balances with Actual Budget balances and performs safe, lock-secured reconciliations.
-- **Pending Transactions Import**: Pending (vorgemerkte) bookings are imported as *uncleared* transactions. Every import run first deletes the pending bookings of the previous run, so they are always in sync with the bank and never survive as stale entries.
+- **Pending Transactions Import**: Pending (vorgemerkte) bookings are imported as *uncleared* transactions. Every run compares the bank's pending list with the previously imported ones: bookings the bank no longer reports as pending are deleted, still pending ones keep their transaction (and any category, payee or note assigned in Actual Budget), new ones are added.
 
 ## Dependencies
 
@@ -215,7 +215,7 @@ Dieses Repository ist in zwei Teile aufgeteilt:
 - **Interaktives Web-Dashboard (SPA)**: Eine wunderschöne, für Smartphones und iOS Safari optimierte Weboberfläche zum Synchronisieren, Verwalten von Banken und Ansehen von Live-Logs (inkl. nativen Bottom-Sheets und Auto-Zoom-Schutz)
 - **Native iOS-App**: Ein 100% nativer SwiftUI-Client mit dynamischem Farbschema, sektionsbasierter Kontoverwaltung, Kontostandsvergleichen, Vorgemerkte-Umsätze-Drawer, haptischem Feedback und Siri-Kurzbefehlen (App Intents) für automatisierte Imports.
 - **Automatische Abstimmung (Reconciliation)**: Gleicht die tatsächlichen Banksalden automatisch mit den Kontoständen in Actual Budget ab und führt sichere, zugriffsgeschützte Kontenabstimmungen durch.
-- **Import vorgemerkter Umsätze**: Vorgemerkte Buchungen werden als *nicht bestätigt* (uncleared) nach Actual Budget importiert. Vor jedem Import werden die Vormerkungen des letzten Laufs gelöscht, damit keine veralteten Vormerkungen zurückbleiben.
+- **Import vorgemerkter Umsätze**: Vorgemerkte Buchungen werden als *nicht bestätigt* (uncleared) nach Actual Budget importiert. Bei jedem Lauf wird die Vormerkungsliste der Bank mit den bereits importierten abgeglichen: Buchungen, die die Bank nicht mehr als vorgemerkt meldet, werden gelöscht, weiterhin vorgemerkte bleiben erhalten (inklusive in Actual Budget gesetzter Kategorie, Empfänger und Notiz), neue kommen hinzu.
 
 ## Abhängigkeiten
 

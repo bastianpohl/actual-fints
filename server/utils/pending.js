@@ -84,10 +84,24 @@ const splitAlreadyBookedPending = (pendingTransactions, bookedRows, options = {}
    return { fresh, duplicates };
 };
 
+/**
+ * Selects the previously imported pending transactions that the bank no longer reports as
+ * pending and that therefore have to be removed from Actual Budget.
+ *
+ * @param {Array<{id:string, imported_id:string}>} existingRows Pending imports in Actual Budget.
+ * @param {Set<string>|Array<string>} stillPendingIds imported_ids the bank still reports as pending.
+ * @returns {Array<{id:string, imported_id:string}>}
+ */
+const selectObsoletePendingImports = (existingRows, stillPendingIds) => {
+   const keep = stillPendingIds instanceof Set ? stillPendingIds : new Set(stillPendingIds || []);
+   return (existingRows || []).filter(row => !keep.has(row.imported_id));
+};
+
 module.exports = {
    dateIntToIso,
    daysBetween,
    normalizePayee,
    payeesMatch,
    splitAlreadyBookedPending,
+   selectObsoletePendingImports,
 };
