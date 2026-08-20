@@ -378,3 +378,51 @@ test('selectObsoletePendingImports accepts an array of ids', () => {
   assert.equal(obsolete.length, 1);
   assert.equal(obsolete[0].imported_id, 'pending-aaa');
 });
+
+
+test('applyHisalPatch tolerates HISAL segments without optional balance groups', () => {
+  const { applyHisalPatch } = require('../lib/fints-hisal-patch');
+  assert.equal(applyHisalPatch(), true);
+
+  const { HISAL } = require('fints/dist/segments/hisal');
+
+  // ING style response: booked balance only, no pending / dispo / available groups
+  const segment = {};
+  HISAL.prototype.deserialize.call(segment, [
+    ['1234567890', '', '280', '50010517'],
+    ['Girokonto'],
+    ['EUR'],
+    ['C', '1234,56'],
+  ]);
+
+  assert.equal(segment.currency, 'EUR');
+  assert.equal(segment.productName, 'Girokonto');
+  assert.equal(segment.bookedBalance, 1234.56);
+  assert.equal(segment.pendingBalance, 0);
+  assert.equal(segment.creditLimit, 0);
+  assert.equal(segment.availableBalance, 0);
+  assert.equal(segment.account.accountNumber, '1234567890');
+});
+
+test('applyHisalPatch still reads complete HISAL segments', () => {
+  const { applyHisalPatch } = require('../lib/fints-hisal-patch');
+  applyHisalPatch();
+
+  const { HISAL } = require('fints/dist/segments/hisal');
+
+  const segment = {};
+  HISAL.prototype.deserialize.call(segment, [
+    ['1234567890', '', '280', '50010517'],
+    ['Girokonto'],
+    ['EUR'],
+    ['C', '1000,00'],
+    ['D', '50,00'],
+    ['2000,00'],
+    ['2950,00'],
+  ]);
+
+  assert.equal(segment.bookedBalance, 1000);
+  assert.equal(segment.pendingBalance, 50);
+  assert.equal(segment.creditLimit, 2000);
+  assert.equal(segment.availableBalance, 2950);
+});

@@ -1,3 +1,8 @@
+const { applyHisalPatch } = require('./fints-hisal-patch');
+
+// Must run before any balance request - see lib/fints-hisal-patch.js
+applyHisalPatch();
+
 const { PinTanClient } = require('fints');
 const { HKKAZ, HKTAN } = require('fints/dist/segments');
 const { HIKAZ } = require('fints/dist/segments/hikaz');

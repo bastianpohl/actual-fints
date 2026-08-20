@@ -9,35 +9,9 @@ const path = require('node:path');
 const { CredentialsStore } = require('./lib/credentials-store');
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
-// Safe monkey-patch for the fints library HISAL segment deserialization
-// to prevent "undefined is not iterable" crashes on banks that omit dispo/available fields.
-try {
-   const { HISAL } = require('fints/dist/segments/hisal');
-   const { Parse } = require('fints/dist/parse');
-   HISAL.prototype.deserialize = function(input) {
-      while (input.length < 7) {
-         input.push([]);
-      }
-      const [
-         [accountNumber, subAccount, _country, blz],
-         [productName],
-         [currency],
-         [_cb, booked],
-         [_cp, pending],
-         [dispo],
-         [available]
-      ] = input;
-      this.account = { accountNumber, subAccount, blz, iban: null, bic: null };
-      this.productName = productName;
-      this.currency = currency;
-      this.bookedBalance = booked ? Parse.num(booked) : 0.0;
-      this.pendingBalance = pending ? Parse.num(pending) : 0.0;
-      this.creditLimit = dispo ? Parse.num(dispo) : 0.0;
-      this.availableBalance = available ? Parse.num(available) : 0.0;
-   };
-} catch (patchErr) {
-   console.error("Failed to apply HISAL patch:", patchErr);
-}
+// Tolerant HISAL deserialization for banks that omit optional balance fields.
+// Shared with the CLI import path via lib/fints-api.js.
+require('./lib/fints-hisal-patch').applyHisalPatch();
 
 
 const app = express();
