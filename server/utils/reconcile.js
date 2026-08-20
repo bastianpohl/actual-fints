@@ -1,7 +1,13 @@
 const api = require('@actual-app/api');
 const Database = require('better-sqlite3');
+const { PENDING_ID_PREFIX } = require('./convert');
 const fs = require('node:fs');
 const path = require('node:path');
+
+// Transactions imported as pending (vorgemerkt) bookings are preliminary: they must not
+// count towards the balance that is compared against the booked bank balance, and they
+// must never be marked as reconciled.
+const EXCLUDE_PENDING_SQL = `AND (financial_id IS NULL OR financial_id NOT LIKE '${PENDING_ID_PREFIX}%')`;
 
 function getDatabasePath(dataDir) {
    if (!fs.existsSync(dataDir)) return null;
@@ -35,6 +41,7 @@ function getAccountBalanceFromDb(dataDir, accountId) {
          WHERE acct = ? 
            AND tombstone = 0 
            AND isChild = 0
+           ${EXCLUDE_PENDING_SQL}
       `).get(accountId);
       const sum = row ? row['SUM(amount)'] : 0;
       return (sum || 0) / 100.0;
@@ -75,6 +82,7 @@ async function reconcileAccountIfSynchronized(accountId, actualAccountName, bank
             WHERE acct = ? 
               AND tombstone = 0 
               AND isChild = 0
+              ${EXCLUDE_PENDING_SQL}
          `).get(accountId);
          const budgetSum = balanceRow ? balanceRow['SUM(amount)'] : 0;
          budgetBalance = (budgetSum || 0) / 100.0; // in Euro
@@ -93,6 +101,7 @@ async function reconcileAccountIfSynchronized(accountId, actualAccountName, bank
               AND transferred_id IS NULL 
               AND isParent = 0 
               AND tombstone = 0
+              ${EXCLUDE_PENDING_SQL}
          `;
          uncatTxs = db.prepare(uncatQuery).all(accountId);
          
@@ -103,6 +112,7 @@ async function reconcileAccountIfSynchronized(accountId, actualAccountName, bank
               AND reconciled = 0 
               AND isChild = 0 
               AND tombstone = 0
+              ${EXCLUDE_PENDING_SQL}
          `;
          unreconciledTxs = db.prepare(unreconciledQuery).all(accountId);
       } finally {

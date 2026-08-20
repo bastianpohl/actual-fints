@@ -491,8 +491,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         
                         const isCredit = tx.amount > 0;
                         const amountClass = isCredit ? 'credit' : 'debit';
-                        const badgeClass = tx.status === 'added' ? 'added' : 'ignored';
-                        const badgeText = tx.status === 'added' ? 'Hinzugefügt' : 'Bereits importiert';
+                        const badgeMap = {
+                           added: { cls: 'added', text: 'Hinzugefügt' },
+                           pending: { cls: 'pending', text: 'Vorgemerkt' }
+                        };
+                        const badge = badgeMap[tx.status] || { cls: 'ignored', text: 'Bereits importiert' };
+                        const badgeClass = badge.cls;
+                        const badgeText = badge.text;
                         
                         row.innerHTML = `
                            <td class="sync-tx-date">${escapeHtml(formatDate(tx.date))}</td>

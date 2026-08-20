@@ -6,7 +6,7 @@ if (typeof globalThis.navigator === 'undefined') {
 
 const api = require('@actual-app/api');
 const { isUid } = require('../utils/uid');
-const { convertTransaction } = require('../utils/convert');
+const { convertTransaction, convertPendingTransaction, PENDING_ID_PREFIX } = require('../utils/convert');
 const { requireEnv } = require('../utils/env');
 
 class BudgetClient {
@@ -153,6 +153,100 @@ class BudgetClient {
       const resolvedTransactions = await Promise.all(transactions);
       const result = await api.importTransactions(this.#activeAccount, resolvedTransactions);
       return result;
+   }
+
+   convertPending(transaction) {
+      if (!this.#activeAccount) throw new Error("No active account id set");
+      if (!transaction || typeof transaction !== 'object') {
+         throw new Error("Invalid transaction object");
+      }
+
+      return convertPendingTransaction(transaction, this.#activeAccount);
+   }
+
+   #openDatabase() {
+      const { getDatabasePath } = require('../utils/reconcile');
+      const Database = require('better-sqlite3');
+      const dbPath = getDatabasePath(this.#AB_PATH);
+      if (!dbPath) {
+         console.warn(`[budget-api] DB-Pfad konnte nicht ermittelt werden.`);
+         return null;
+      }
+      return new Database(dbPath);
+   }
+
+   /**
+    * Removes every uncleared transaction of the active account that was created by a
+    * previous pending import (imported_id prefixed with "pending-"). Manually entered
+    * uncleared transactions are left untouched.
+    *
+    * @returns {Promise<number>} Number of deleted transactions.
+    */
+   async deletePendingImports() {
+      await this.#initClient();
+      if (!this.#activeAccount) throw new Error("No active account id set");
+
+      let rows = [];
+      const db = this.#openDatabase();
+      if (!db) return 0;
+      try {
+         rows = db.prepare(`
+            SELECT id FROM transactions
+            WHERE acct = ?
+              AND tombstone = 0
+              AND isChild = 0
+              AND financial_id LIKE ?
+         `).all(this.#activeAccount, `${PENDING_ID_PREFIX}%`);
+      } finally {
+         db.close();
+      }
+
+      let deleted = 0;
+      for (const row of rows) {
+         try {
+            await api.deleteTransaction(row.id);
+            deleted++;
+         } catch (error) {
+            console.warn(`[budget-api] Vorgemerkte Buchung ${row.id} konnte nicht gelöscht werden: ${error.message}`);
+         }
+      }
+      return deleted;
+   }
+
+   /**
+    * Returns booked (non-pending) transactions of the active account since a given date,
+    * used to detect pending bookings that already arrived as a real booking.
+    *
+    * @param {string} sinceDate Date in YYYY-MM-DD format.
+    * @returns {Promise<Array<{amount:number,date:number,payee:string}>>}
+    */
+   async getBookedTransactionsSince(sinceDate) {
+      await this.#initClient();
+      if (!this.#activeAccount) throw new Error("No active account id set");
+
+      const db = this.#openDatabase();
+      if (!db) return [];
+      try {
+         const dateInt = Number(String(sinceDate).replace(/-/g, ''));
+         return db.prepare(`
+            SELECT t.amount AS amount,
+                   t.date AS date,
+                   COALESCE(NULLIF(t.imported_description, ''), p.name, '') AS payee
+            FROM transactions t
+            LEFT JOIN payee_mapping pm ON pm.id = t.description
+            LEFT JOIN payees p ON p.id = COALESCE(pm.targetId, t.description)
+            WHERE t.acct = ?
+              AND t.tombstone = 0
+              AND t.isChild = 0
+              AND t.date >= ?
+              AND (t.financial_id IS NULL OR t.financial_id NOT LIKE ?)
+         `).all(this.#activeAccount, Number.isNaN(dateInt) ? 0 : dateInt, `${PENDING_ID_PREFIX}%`);
+      } catch (error) {
+         console.warn(`[budget-api] Gebuchte Umsätze konnten nicht gelesen werden: ${error.message}`);
+         return [];
+      } finally {
+         db.close();
+      }
    }
 
    async close() {

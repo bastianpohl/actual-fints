@@ -18,6 +18,7 @@ This repository is split into two parts:
 - **Interactive Web Dashboard (SPA)**: A beautiful mobile-optimized interface to sync transactions, view live logs, and manage accounts (with premium iOS native bottom-sheets and auto-zoom prevention)
 - **Native iOS App**: A 100% native SwiftUI client featuring dynamic themes, section-based bank configuration mapping, balance comparison, pending transactions drawer, custom haptic feedback, and a Siri Shortcut / App Intent integration for automated imports.
 - **Automated Reconciliation**: Automatically matches bank balances with Actual Budget balances and performs safe, lock-secured reconciliations.
+- **Pending Transactions Import**: Pending (vorgemerkte) bookings are imported as *uncleared* transactions. Every import run first deletes the pending bookings of the previous run, so they are always in sync with the bank and never survive as stale entries.
 
 ## Dependencies
 
@@ -59,6 +60,10 @@ MASTER_KEY=ein-sicheres-master-passwort
 LOCALE=de-DE
 PORT=3000
 SERVICE_NAME=actual-fints-api
+
+# Optional: pending transactions import (enabled by default)
+IMPORT_PENDING=true
+PENDING_DAYS=30
 ```
 
 ### Bank Setup
@@ -210,6 +215,7 @@ Dieses Repository ist in zwei Teile aufgeteilt:
 - **Interaktives Web-Dashboard (SPA)**: Eine wunderschöne, für Smartphones und iOS Safari optimierte Weboberfläche zum Synchronisieren, Verwalten von Banken und Ansehen von Live-Logs (inkl. nativen Bottom-Sheets und Auto-Zoom-Schutz)
 - **Native iOS-App**: Ein 100% nativer SwiftUI-Client mit dynamischem Farbschema, sektionsbasierter Kontoverwaltung, Kontostandsvergleichen, Vorgemerkte-Umsätze-Drawer, haptischem Feedback und Siri-Kurzbefehlen (App Intents) für automatisierte Imports.
 - **Automatische Abstimmung (Reconciliation)**: Gleicht die tatsächlichen Banksalden automatisch mit den Kontoständen in Actual Budget ab und führt sichere, zugriffsgeschützte Kontenabstimmungen durch.
+- **Import vorgemerkter Umsätze**: Vorgemerkte Buchungen werden als *nicht bestätigt* (uncleared) nach Actual Budget importiert. Vor jedem Import werden die Vormerkungen des letzten Laufs gelöscht, damit keine veralteten Vormerkungen zurückbleiben.
 
 ## Abhängigkeiten
 
@@ -251,6 +257,10 @@ MASTER_KEY=ein-sicheres-master-passwort
 LOCALE=de-DE
 PORT=3000
 SERVICE_NAME=actual-fints-api
+
+# Optional: Import vorgemerkter Umsätze (standardmäßig aktiv)
+IMPORT_PENDING=true
+PENDING_DAYS=30
 ```
 
 ### Bank-Setup

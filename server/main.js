@@ -7,7 +7,72 @@ const { CredentialsStore } = require('./lib/credentials-store');
 const { maskIban } = require('./utils/mask');
 
 const parseDateRange = require('./utils/parseDateRange');
+const { splitAlreadyBookedPending } = require('./utils/pending');
 const { sendSuccessNotification, sendFailureNotification, sendWarningNotification } = require('./utils/notifications');
+
+// Pending (vorgemerkte) bookings are always current, therefore they are fetched for a
+// fixed window instead of the booked date range (which defaults to today only).
+const PENDING_WINDOW_DAYS = Number(process.env.PENDING_DAYS) > 0 ? Number(process.env.PENDING_DAYS) : 30;
+const isPendingImportEnabled = () => !['false', '0', 'no'].includes(String(process.env.IMPORT_PENDING ?? 'true').toLowerCase());
+
+const shiftIsoDate = (isoDate, days) => {
+   const date = new Date(`${isoDate}T00:00:00Z`);
+   if (Number.isNaN(date.getTime())) return isoDate;
+   date.setUTCDate(date.getUTCDate() + days);
+   return date.toISOString().slice(0, 10);
+};
+
+/**
+ * Imports the pending (vorgemerkte) bookings of the currently active account as uncleared
+ * transactions. Pending bookings that already arrived as a real booking are skipped.
+ *
+ * @returns {Promise<{added: number, skipped: number, details: Array}>}
+ */
+const importPendingTransactions = async (fintsClient, budgetClient) => {
+   const toDate = new Date();
+   const fromDate = new Date(Date.now() - PENDING_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+   const pendingTransactions = await fintsClient.getPendingTransactions(fromDate, toDate);
+   if (!pendingTransactions || pendingTransactions.length === 0) {
+      return { added: 0, skipped: 0, details: [] };
+   }
+
+   const converted = [];
+   for (const transaction of pendingTransactions) {
+      try {
+         converted.push(budgetClient.convertPending(transaction));
+      } catch (convertErr) {
+         console.error('Vorgemerkte Buchung übersprungen:', convertErr.message);
+      }
+   }
+   if (converted.length === 0) return { added: 0, skipped: 0, details: [] };
+
+   // Skip pending bookings that the bank already delivered as a booked transaction
+   const earliestDate = converted.reduce((min, t) => (t.date < min ? t.date : min), converted[0].date);
+   const bookedRows = await budgetClient.getBookedTransactionsSince(shiftIsoDate(earliestDate, -7));
+   const { fresh, duplicates } = splitAlreadyBookedPending(converted, bookedRows);
+
+   if (fresh.length === 0) {
+      return { added: 0, skipped: duplicates.length, details: [] };
+   }
+
+   const importResult = await budgetClient.importTransactions(fresh);
+   const addedIds = new Set((importResult?.added ?? []).map(t => t.imported_id));
+   const addedTransactions = fresh.filter(t => addedIds.has(t.imported_id));
+
+   const details = addedTransactions.map(t => ({
+      date: t.date,
+      payee: t.payee_name || 'Unbekannter Empfänger',
+      amount: t.amount,
+      status: 'pending'
+   }));
+
+   return {
+      added: addedTransactions.length,
+      skipped: duplicates.length + (fresh.length - addedTransactions.length),
+      details
+   };
+};
 
 const main = async () => {
 
@@ -72,6 +137,10 @@ const main = async () => {
    }
 
    const results = [];
+   const pendingImportEnabled = isPendingImportEnabled();
+   if (!pendingImportEnabled) {
+      console.error('Import der vorgemerkten Umsätze ist per IMPORT_PENDING deaktiviert.');
+   }
 
    for (const bank of banks) {
       console.error(`\n── Bank: ${bank.name} ──`);
@@ -105,23 +174,36 @@ const main = async () => {
             await budgetClient.setActiveAccount(accountMapping.actualAccountName);
 
             console.error('Verarbeite Konto:', maskIban(accountMapping.iban), '->', accountMapping.actualAccountName);
-            const transactions = await fintsClient.getTransaktions(startDate, endDate);
 
-            if (!transactions || transactions.length === 0) {
-               continue;
+            // Remove the pending bookings of the previous run before importing anything new
+            let removedPending = 0;
+            if (pendingImportEnabled) {
+               try {
+                  removedPending = await budgetClient.deletePendingImports();
+                  if (removedPending > 0) {
+                     console.error(`Vorgemerkte Buchungen des letzten Laufs entfernt: ${removedPending}`);
+                  }
+               } catch (deleteErr) {
+                  console.error('Fehler beim Entfernen der vorgemerkten Buchungen:', deleteErr.message);
+               }
             }
 
+            const transactions = await fintsClient.getTransaktions(startDate, endDate) || [];
             const budgetTransactions = transactions.map(t => budgetClient.convert(t));
+
+            let added = 0;
+            let updated = 0;
+            let txDetails = [];
+            let warnings = [];
 
             if (budgetTransactions.length > 0) {
                const existingIds = await budgetClient.getExistingImportedIds();
                
                const importResult = await budgetClient.importTransactions(budgetTransactions);
-               const added = importResult?.added?.length ?? 0;
-               const updated = importResult?.updated?.length ?? 0;
+               added = importResult?.added?.length ?? 0;
+               updated = importResult?.updated?.length ?? 0;
 
                // Detect mismatch warnings for ignored transactions
-               const warnings = [];
                if (importResult?.updatedPreview) {
                   const api = require('@actual-app/api');
                   const ignoredList = importResult.updatedPreview.filter(p => p.ignored);
@@ -170,7 +252,7 @@ const main = async () => {
                            // Query payee name
                            let payeeName = 'Unbekannt';
                            if (bestMatch.payee) {
-                              const payeeRow = await runQuery(q('payees').filter({ id: bestMatch.payee }).select('name'));
+                              const payeeRow = await api.aqlQuery(api.q('payees').filter({ id: bestMatch.payee }).select('name'));
                               payeeName = payeeRow?.data?.[0]?.name || bestMatch.payee;
                            }
                            
@@ -193,7 +275,7 @@ const main = async () => {
                   }
                }
 
-               const txDetails = budgetTransactions.map(bt => {
+               txDetails = budgetTransactions.map(bt => {
                   const isExisting = existingIds.has(bt.imported_id);
                   return {
                      date: bt.date,
@@ -203,11 +285,35 @@ const main = async () => {
                   };
                });
 
+            }
+
+            // Import the currently pending (vorgemerkte) bookings as uncleared transactions
+            let pendingAdded = 0;
+            let pendingSkipped = 0;
+            if (pendingImportEnabled) {
+               try {
+                  const pendingResult = await importPendingTransactions(fintsClient, budgetClient);
+                  pendingAdded = pendingResult.added;
+                  pendingSkipped = pendingResult.skipped;
+                  txDetails = txDetails.concat(pendingResult.details);
+                  if (pendingAdded > 0 || pendingSkipped > 0) {
+                     console.error(`Vorgemerkte Buchungen: ${pendingAdded} importiert, ${pendingSkipped} bereits gebucht bzw. übersprungen.`);
+                  }
+               } catch (pendingErr) {
+                  console.error(`Fehler beim Import der vorgemerkten Umsätze für ${maskIban(accountMapping.iban)}:`, pendingErr.message);
+               }
+            }
+
+            const accountChanged = budgetTransactions.length > 0 || pendingAdded > 0 || removedPending > 0;
+
+            if (accountChanged) {
                const accountResult = {
                   account: accountMapping.actualAccountName,
                   added,
                   updated,
                   ignored: budgetTransactions.length - added,
+                  pendingAdded,
+                  pendingRemoved: removedPending,
                   transactions: txDetails
                };
 
@@ -230,6 +336,7 @@ const main = async () => {
                }
 
                // Trigger automatic reconciliation if account balance is synchronized and all transactions are categorized
+               // (pending bookings are excluded from both the balance and the reconciliation)
                try {
                   const bal = await fintsClient.getBalance(matchedFintsAccount);
                   const activeAccountId = budgetClient.getActiveAccountId();

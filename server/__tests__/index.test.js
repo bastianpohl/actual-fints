@@ -3,7 +3,8 @@ const assert = require('assert/strict');
 
 const { decodeText } = require('../utils/decodeText');
 const { isUid } = require('../utils/uid')
-const { convertAmount, getNotes, getPayeeName, convertTransaction } = require ('../utils/convert');
+const { convertAmount, getNotes, getPayeeName, convertTransaction, convertPendingTransaction, PENDING_ID_PREFIX } = require ('../utils/convert');
+const { splitAlreadyBookedPending, dateIntToIso, payeesMatch } = require('../utils/pending');
 const { requireEnv } = require('../utils/env');
 const parseDateRange = require('../utils/parseDateRange');
 
@@ -204,7 +205,8 @@ test('getAccountBalanceFromDb correctly sums only normal and parent transactions
       amount INTEGER,
       isParent INTEGER,
       isChild INTEGER,
-      tombstone INTEGER
+      tombstone INTEGER,
+      financial_id TEXT
     )
   `).run();
 
@@ -233,6 +235,11 @@ test('getAccountBalanceFromDb correctly sums only normal and parent transactions
      'tx-child-3b', accountId, 4000, 0, 1, 0
   );
 
+  // 5. Imported pending booking (uncleared, preliminary): must not count towards the balance
+  db.prepare('INSERT INTO transactions (id, acct, amount, isParent, isChild, tombstone, financial_id) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+     'tx-pending-4', accountId, 2500, 0, 0, 0, 'pending-abc123'
+  );
+
   db.close();
 
   // Call the function
@@ -250,3 +257,91 @@ test('getAccountBalanceFromDb correctly sums only normal and parent transactions
 
 
 
+
+
+test('convertPendingTransaction marks the transaction as uncleared and prefixes the imported_id', () => {
+  const transaction = {
+    id: 'abc123',
+    amount: 12.54,
+    isCredit: false,
+    valueDate: '2026-06-10',
+    entryDate: '2026-06-19',
+    descriptionStructured: { name: 'Lidl', reference: { text: 'Kaufumsatz' } },
+  };
+
+  const converted = convertPendingTransaction(transaction, 'acc-1');
+
+  assert.equal(converted.account, 'acc-1');
+  assert.equal(converted.amount, -1254);
+  assert.equal(converted.cleared, false);
+  assert.equal(converted.imported_id, `${PENDING_ID_PREFIX}abc123`);
+  // The value date is closer to the eventual booking date than the entry date
+  assert.equal(converted.date, '2026-06-10');
+  assert.ok(converted.notes.startsWith('⏳ Vorgemerkt'));
+});
+
+test('convertPendingTransaction falls back to the entry date', () => {
+  const converted = convertPendingTransaction(
+    { id: 'x', amount: 5, isCredit: true, entryDate: '2026-06-19' },
+    'acc-1'
+  );
+  assert.equal(converted.date, '2026-06-19');
+  assert.equal(converted.amount, 500);
+});
+
+test('convertPendingTransaction rejects transactions without a usable date', () => {
+  assert.throws(
+    () => convertPendingTransaction({ id: 'x', amount: 5, isCredit: true }, 'acc-1'),
+    /valid valueDate or entryDate/
+  );
+});
+
+test('dateIntToIso converts Actual date integers', () => {
+  assert.equal(dateIntToIso(20260610), '2026-06-10');
+  assert.equal(dateIntToIso('not-a-date'), null);
+});
+
+test('payeesMatch compares normalized payee names', () => {
+  assert.equal(payeesMatch('EDK*Getraenke Bruss', 'edk getraenke bruss'), true);
+  assert.equal(payeesMatch('Lidl sagt Danke', 'Aldi Sued'), false);
+  assert.equal(payeesMatch('', 'Lidl'), false);
+});
+
+test('splitAlreadyBookedPending skips pending bookings that already arrived as booked', () => {
+  const pending = [
+    { amount: -1254, date: '2026-06-10', payee_name: 'Lidl Gelsenkirchen' },
+    { amount: -2176, date: '2026-06-11', payee_name: 'Aldi Sued' },
+  ];
+  const booked = [
+    { amount: -1254, date: 20260612, payee: 'Lidl Gelsenkirchen' },
+  ];
+
+  const { fresh, duplicates } = splitAlreadyBookedPending(pending, booked);
+
+  assert.equal(duplicates.length, 1);
+  assert.equal(fresh.length, 1);
+  assert.equal(fresh[0].payee_name, 'Aldi Sued');
+});
+
+test('splitAlreadyBookedPending keeps pending bookings outside the date window', () => {
+  const pending = [{ amount: -1254, date: '2026-06-10', payee_name: 'Lidl' }];
+  const booked = [{ amount: -1254, date: 20260601, payee: 'Lidl' }];
+
+  const { fresh, duplicates } = splitAlreadyBookedPending(pending, booked);
+
+  assert.equal(fresh.length, 1);
+  assert.equal(duplicates.length, 0);
+});
+
+test('splitAlreadyBookedPending consumes each booked transaction only once', () => {
+  const pending = [
+    { amount: -1000, date: '2026-06-10', payee_name: 'Rewe' },
+    { amount: -1000, date: '2026-06-10', payee_name: 'Rewe' },
+  ];
+  const booked = [{ amount: -1000, date: 20260610, payee: 'Rewe' }];
+
+  const { fresh, duplicates } = splitAlreadyBookedPending(pending, booked);
+
+  assert.equal(duplicates.length, 1);
+  assert.equal(fresh.length, 1);
+});

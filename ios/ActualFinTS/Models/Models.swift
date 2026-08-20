@@ -69,7 +69,7 @@ struct ImportedTransaction: Codable, Identifiable, Equatable {
     let account: String
     let payee: String
     let amount: Double
-    let status: String // "added" or "updated" or "ignored"
+    let status: String // "added", "updated", "ignored" or "pending"
 }
 
 struct SyncResponse: Codable {

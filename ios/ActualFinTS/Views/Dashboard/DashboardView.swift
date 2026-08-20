@@ -422,16 +422,31 @@ struct DashboardView: View {
                     .fontWeight(.bold)
                     .foregroundColor(tx.amount < 0 ? .themeTextPrimary : .themeSuccess)
                 
-                Text(tx.status == "added" ? "Neu" : "Aktualisiert")
+                Text(statusLabel(for: tx.status))
                     .font(.system(size: 9, weight: .bold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(tx.status == "added" ? Color.themeAccent : Color.themeWarning)
+                    .background(statusColor(for: tx.status))
                     .cornerRadius(4)
             }
         }
         .padding()
+    }
+    
+    private func statusLabel(for status: String) -> String {
+        switch status {
+        case "added": return "Neu"
+        case "pending": return "Vorgemerkt"
+        default: return "Aktualisiert"
+        }
+    }
+    
+    private func statusColor(for status: String) -> Color {
+        switch status {
+        case "added": return Color.themeAccent
+        default: return Color.themeWarning
+        }
     }
     
     private func loadServerStatus() async {
