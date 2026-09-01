@@ -16,10 +16,9 @@ This repository is split into two parts:
 - Duplicate detection through Actual Budget's `importTransactions` API
 - REST API to trigger imports via HTTP requests
 - **Interactive Web Dashboard (SPA)**: A beautiful mobile-optimized interface to sync transactions, view live logs, and manage accounts (with premium iOS native bottom-sheets and auto-zoom prevention)
-- **Native iOS App**: A 100% native SwiftUI client featuring dynamic themes, section-based bank configuration mapping, balance comparison, pending transactions drawer, custom haptic feedback, and a Siri Shortcut / App Intent integration for automated imports.
+- **Native iOS App**: A 100% native SwiftUI client featuring dynamic themes, section-based bank configuration mapping, balance comparison, custom haptic feedback, and a Siri Shortcut / App Intent integration for automated imports.
 - **Automated Reconciliation**: Automatically matches bank balances with Actual Budget balances and performs safe, lock-secured reconciliations.
 - **Rolling import window**: Without an explicit date range the import covers the last `SYNC_LOOKBACK_DAYS` days (default 7) instead of just the current day. Banks post card fees and foreign currency charges a day or two late, backdated to the entry date of the purchase — a single-day range would miss those permanently. Re-reading a booking is free because Actual Budget deduplicates by `imported_id`.
-- **Pending Transactions Import**: Pending (vorgemerkte) bookings are imported as *uncleared* transactions. Every run compares the bank's pending list with the previously imported ones: bookings the bank no longer reports as pending are deleted, still pending ones keep their transaction (and any category, payee or note assigned in Actual Budget), new ones are added. When a pending booking turns into a booked transaction, the category assigned to it is carried over to that booking before the pending entry is removed (an existing category is never overwritten). Matching tolerates the card scheme prefix of booked card payments and the exchange rate deviation of foreign currency bookings.
 
 ## Dependencies
 
@@ -61,10 +60,6 @@ MASTER_KEY=ein-sicheres-master-passwort
 LOCALE=de-DE
 PORT=3000
 SERVICE_NAME=actual-fints-api
-
-# Optional: pending transactions import (enabled by default)
-IMPORT_PENDING=true
-PENDING_DAYS=30
 
 # Optional: days the import looks back when no explicit range is given (default: 7)
 SYNC_LOOKBACK_DAYS=7
@@ -217,10 +212,9 @@ Dieses Repository ist in zwei Teile aufgeteilt:
 - REST-API zum Auslösen des Imports per HTTP-Request
 - DSGVO-konformes Logging (IBANs werden maskiert)
 - **Interaktives Web-Dashboard (SPA)**: Eine wunderschöne, für Smartphones und iOS Safari optimierte Weboberfläche zum Synchronisieren, Verwalten von Banken und Ansehen von Live-Logs (inkl. nativen Bottom-Sheets und Auto-Zoom-Schutz)
-- **Native iOS-App**: Ein 100% nativer SwiftUI-Client mit dynamischem Farbschema, sektionsbasierter Kontoverwaltung, Kontostandsvergleichen, Vorgemerkte-Umsätze-Drawer, haptischem Feedback und Siri-Kurzbefehlen (App Intents) für automatisierte Imports.
+- **Native iOS-App**: Ein 100% nativer SwiftUI-Client mit dynamischem Farbschema, sektionsbasierter Kontoverwaltung, Kontostandsvergleichen, haptischem Feedback und Siri-Kurzbefehlen (App Intents) für automatisierte Imports.
 - **Automatische Abstimmung (Reconciliation)**: Gleicht die tatsächlichen Banksalden automatisch mit den Kontoständen in Actual Budget ab und führt sichere, zugriffsgeschützte Kontenabstimmungen durch.
 - **Rollierendes Import-Fenster**: Ohne expliziten Zeitraum umfasst der Import die letzten `SYNC_LOOKBACK_DAYS` Tage (Standard: 7) statt nur den aktuellen Tag. Banken stellen Kartenentgelte und Auslandseinsatzentgelte ein bis zwei Tage später ein, rückdatiert auf den Buchungstag des Einkaufs — bei einem Ein-Tages-Zeitraum fallen sie dauerhaft durch. Ein erneutes Einlesen kostet nichts, da Actual Budget über die `imported_id` dedupliziert.
-- **Import vorgemerkter Umsätze**: Vorgemerkte Buchungen werden als *nicht bestätigt* (uncleared) nach Actual Budget importiert. Bei jedem Lauf wird die Vormerkungsliste der Bank mit den bereits importierten abgeglichen: Buchungen, die die Bank nicht mehr als vorgemerkt meldet, werden gelöscht, weiterhin vorgemerkte bleiben erhalten (inklusive in Actual Budget gesetzter Kategorie, Empfänger und Notiz), neue kommen hinzu. Wird eine Vormerkung gebucht, übernimmt der gebuchte Umsatz die Kategorie der Vormerkung, bevor diese entfernt wird (eine bereits gesetzte Kategorie wird nie überschrieben). Der Abgleich toleriert das Kartenschema-Präfix gebuchter Kartenzahlungen und die Kursabweichung bei Fremdwährungsbuchungen.
 
 ## Abhängigkeiten
 
@@ -262,10 +256,6 @@ MASTER_KEY=ein-sicheres-master-passwort
 LOCALE=de-DE
 PORT=3000
 SERVICE_NAME=actual-fints-api
-
-# Optional: Import vorgemerkter Umsätze (standardmäßig aktiv)
-IMPORT_PENDING=true
-PENDING_DAYS=30
 
 # Optional: Tage, die der Import ohne expliziten Zeitraum zurückblickt (Standard: 7)
 SYNC_LOOKBACK_DAYS=7

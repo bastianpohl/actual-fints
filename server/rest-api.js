@@ -1079,16 +1079,6 @@ app.get('/api/banks/balances', async (req, res) => {
       const balances = [];
       const errors = [];
 
-      const pendingCachePath = path.join(__dirname, 'pending-transactions.json');
-      let allPendingTransactions = {};
-      if (fs.existsSync(pendingCachePath)) {
-         try {
-            allPendingTransactions = JSON.parse(fs.readFileSync(pendingCachePath, 'utf8'));
-         } catch (readErr) {
-            console.error(`Fehler beim Lesen des vorgemerkten Umsätze Cache:`, readErr);
-         }
-      }
-
       for (const bank of banks) {
          const { FinTSClient } = require('./lib/fints-api');
          try {
@@ -1111,49 +1101,10 @@ app.get('/api/banks/balances', async (req, res) => {
             for (const acc of accountsToQuery) {
                try {
                   const bal = await client.getBalance(acc);
-                  
-                  let pendingTx = [];
-                  let fetchedPendingOk = false;
-                  try {
-                     const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-                     const toDate = new Date();
-                     client.setAccount(acc.iban);
-                     pendingTx = await client.getPendingTransactions(fromDate, toDate);
-                     fetchedPendingOk = true;
-                  } catch (pendingErr) {
-                     console.error(`Fehler beim Laden der vorgemerkten Umsätze für ${acc.iban}:`, pendingErr);
-                     if (allPendingTransactions[acc.iban]) {
-                        pendingTx = allPendingTransactions[acc.iban];
-                     }
-                  }
-
-                  if (fetchedPendingOk) {
-                     allPendingTransactions[acc.iban] = pendingTx || [];
-                  }
-
-                  let calculatedPendingBalance = 0.0;
-                  const mappedPending = [];
-                  if (pendingTx && pendingTx.length > 0) {
-                     for (const tx of pendingTx) {
-                        const amount = Number(tx.amount);
-                        const sign = tx.isCredit ? 1.0 : -1.0;
-                        calculatedPendingBalance += amount * sign;
-
-                        mappedPending.push({
-                           id: tx.id,
-                           amount: amount,
-                           isCredit: tx.isCredit,
-                           valueDate: tx.valueDate,
-                           entryDate: tx.entryDate || null,
-                           payee: tx.descriptionStructured?.name || 'Unbekannt',
-                           purpose: tx.descriptionStructured?.reference?.text || tx.description || ''
-                        });
-                     }
-                  }
 
                   const mappedAcc = bank.accounts.find(a => a.iban.toUpperCase().replace(/\s+/g, '') === acc.iban.toUpperCase().replace(/\s+/g, ''));
                   const displayName = mappedAcc ? mappedAcc.actualAccountName : (acc.accountName || acc.iban);
-                  
+
                   // Trigger automatic reconciliation if account balance is synchronized and all transactions are categorized
                   if (mappedAcc && budgetClient) {
                      try {
@@ -1167,17 +1118,15 @@ app.get('/api/banks/balances', async (req, res) => {
                         console.error(`[Reconciliation-Fehler] Automatische Abstimmung für "${displayName}" fehlgeschlagen:`, recErr.message);
                      }
                   }
-                  
+
                   const actualBal = actualBalances[displayName] !== undefined ? actualBalances[displayName] : null;
-                  
+
                   balances.push({
                      iban: acc.iban,
                      name: displayName,
                      productName: bal.productName || null,
                      balance: bal.bookedBalance,
                      actualBalance: actualBal,
-                     pendingBalance: calculatedPendingBalance,
-                     pendingTransactions: mappedPending,
                      currency: bal.currency || 'EUR',
                      bankName: bank.name,
                      lastUpdated: new Date().toISOString()
@@ -1197,13 +1146,6 @@ app.get('/api/banks/balances', async (req, res) => {
                error: bankErr.message
             });
          }
-      }
-
-      try {
-         fs.writeFileSync(pendingCachePath, JSON.stringify(allPendingTransactions, null, 2), 'utf8');
-         console.log(`Vorgemerkte Umsätze erfolgreich unter ${pendingCachePath} gespeichert.`);
-      } catch (writeErr) {
-         console.error(`Fehler beim Schreiben der vorgemerkten Umsätze cache:`, writeErr);
       }
 
       return res.json({ success: true, balances, errors });
@@ -1617,16 +1559,6 @@ app.post('/api/transactions/load', async (req, res) => {
          }
 
          if (code === 0) {
-            const pendingCachePath = path.join(__dirname, 'pending-transactions.json');
-            if (fs.existsSync(pendingCachePath)) {
-               try {
-                  fs.unlinkSync(pendingCachePath);
-                  console.log(`Deleted pending transactions cache ${pendingCachePath} due to successful transaction sync.`);
-               } catch (unlinkErr) {
-                  console.error(`Fehler beim Löschen der vorgemerkten Umsätze:`, unlinkErr);
-               }
-            }
-
             let results = [];
             try {
                const lines = output.trim().split('\n');

@@ -29,7 +29,6 @@ struct DashboardView: View {
     @State private var isLoadingBalances = false
     @State private var balancesError: String? = nil
     @State private var bankErrors: [BankBalanceError] = []
-    @State private var selectedAccountForPending: AccountBalance? = nil
     
     var body: some View {
         NavigationStack {
@@ -107,77 +106,61 @@ struct DashboardView: View {
                         } else {
                             VStack(spacing: 12) {
                                 ForEach(accountBalances) { acc in
-                                    let hasPending = acc.pendingTransactions != nil && !acc.pendingTransactions!.isEmpty
-                                    
-                                    Button(action: {
-                                        if hasPending {
-                                            selectedAccountForPending = acc
-                                        }
-                                    }) {
-                                        HStack {
-                                            VStack(alignment: .leading, spacing: 4) {
-                                                HStack(spacing: 6) {
-                                                    Text(acc.name)
-                                                        .font(.subheadline)
-                                                        .fontWeight(.semibold)
-                                                        .foregroundColor(.themeTextPrimary)
-                                                    
-                                                    if let actualBal = acc.actualBalance {
-                                                        let delta = acc.balance - actualBal
-                                                        if abs(delta) < 0.01 {
-                                                            Image(systemName: "checkmark.circle.fill")
-                                                                .font(.caption2)
-                                                                .foregroundColor(.themeSuccess)
-                                                        } else {
-                                                            Image(systemName: "exclamationmark.triangle.fill")
-                                                                .font(.caption2)
-                                                                .foregroundColor(.themeDanger)
-                                                        }
-                                                    }
-                                                }
-                                                Text("\(acc.bankName) • \(formatISO(acc.lastUpdated))")
-                                                    .font(.caption2)
-                                                    .foregroundColor(.themeTextSecondary)
-                                            }
-                                            Spacer()
-                                            VStack(alignment: .trailing, spacing: 2) {
-                                                Text(hideBalances ? "•••• €" : acc.balance.formattedAsGermanCurrency())
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            HStack(spacing: 6) {
+                                                Text(acc.name)
                                                     .font(.subheadline)
-                                                    .fontWeight(.bold)
-                                                    .foregroundColor(acc.balance < 0 ? .themeDanger : .themeTextPrimary)
-                                                
+                                                    .fontWeight(.semibold)
+                                                    .foregroundColor(.themeTextPrimary)
+
                                                 if let actualBal = acc.actualBalance {
                                                     let delta = acc.balance - actualBal
-                                                    if abs(delta) >= 0.01 {
-                                                        Text("Actual: \(hideBalances ? "•••• €" : actualBal.formattedAsGermanCurrency()) (Delta: \(delta > 0 ? "+" : "")\(hideBalances ? "•••• €" : delta.formattedAsGermanCurrency()))")
-                                                            .font(.system(size: 10))
-                                                            .fontWeight(.medium)
-                                                            .foregroundColor(.themeDanger)
-                                                    } else {
-                                                        Text("Synchron")
-                                                            .font(.system(size: 9, weight: .bold))
+                                                    if abs(delta) < 0.01 {
+                                                        Image(systemName: "checkmark.circle.fill")
+                                                            .font(.caption2)
                                                             .foregroundColor(.themeSuccess)
+                                                    } else {
+                                                        Image(systemName: "exclamationmark.triangle.fill")
+                                                            .font(.caption2)
+                                                            .foregroundColor(.themeDanger)
                                                     }
                                                 }
-                                                
-                                                if let pending = acc.pendingBalance, pending != 0 {
-                                                    HStack(spacing: 4) {
-                                                        Text("Vorgemerkt: \(hideBalances ? "•••• €" : pending.formattedAsGermanCurrency())")
-                                                        if hasPending {
-                                                            Image(systemName: "chevron.right")
-                                                                .font(.system(size: 9, weight: .bold))
-                                                        }
-                                                    }
-                                                    .font(.caption2)
-                                                    .foregroundColor(.themeTextSecondary)
+                                            }
+                                            Text("\(acc.bankName) • \(formatISO(acc.lastUpdated))")
+                                                .font(.caption2)
+                                                .foregroundColor(.themeTextSecondary)
+                                        }
+                                        Spacer()
+                                        VStack(alignment: .trailing, spacing: 2) {
+                                            Text(hideBalances ? "•••• €" : acc.balance.formattedAsGermanCurrency())
+                                                .font(.subheadline)
+                                                .fontWeight(.bold)
+                                                .foregroundColor(acc.balance < 0 ? .themeDanger : .themeTextPrimary)
+
+                                            if let actualBal = acc.actualBalance {
+                                                let delta = acc.balance - actualBal
+                                                if abs(delta) >= 0.01 {
+                                                    Text("Actual: \(hideBalances ? "•••• €" : actualBal.formattedAsGermanCurrency()) (Delta: \(delta > 0 ? "+" : "")\(hideBalances ? "•••• €" : delta.formattedAsGermanCurrency()))")
+                                                        .font(.system(size: 10))
+                                                        .fontWeight(.medium)
+                                                        .foregroundColor(.themeDanger)
+                                                } else {
+                                                    Text("Synchron")
+                                                        .font(.system(size: 9, weight: .bold))
+                                                        .foregroundColor(.themeSuccess)
                                                 }
                                             }
                                         }
-                                        .contentShape(Rectangle())
                                     }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .disabled(!hasPending)
-                                    
+                                    .padding()
+                                    .background(Color.themeCardBg)
+                                    .cornerRadius(12)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color.themeCardBorder, lineWidth: 1)
+                                    )
+
                                     if acc.id != accountBalances.last?.id {
                                         Divider()
                                     }
@@ -373,9 +356,6 @@ struct DashboardView: View {
                 }
             }
         }
-        .sheet(item: $selectedAccountForPending) { acc in
-            PendingTransactionsSheet(account: acc)
-        }
         .onAppear {
             // Load from local cache first for instant rendering
             if let cachedBalances: [AccountBalance] = LocalCacheManager.shared.load(from: "balances.json") {
@@ -458,7 +438,6 @@ struct DashboardView: View {
     private func statusLabel(for status: String) -> String {
         switch status {
         case "added": return "Neu"
-        case "pending": return "Vorgemerkt"
         default: return "Aktualisiert"
         }
     }
@@ -588,189 +567,6 @@ struct DashboardView: View {
         
         let outputFormatter = DateFormatter()
         outputFormatter.locale = Locale(identifier: "de_DE")
-        outputFormatter.dateFormat = "dd.MM.yyyy"
-        return outputFormatter.string(from: date)
-    }
-}
-
-struct PendingTransactionsSheet: View {
-    let account: AccountBalance
-    @Environment(\.dismiss) var dismiss
-    @State private var expandedTransactionIds: Set<String> = []
-    @AppStorage("hideBalances") private var hideBalances = false
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                // Header overview card
-                VStack(spacing: 8) {
-                    Text(account.name)
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.themeTextPrimary)
-                    Text("\(account.bankName) • IBAN \(formatIban(account.iban))")
-                        .font(.caption)
-                        .foregroundColor(.themeTextSecondary)
-                    
-                    if let pending = account.pendingBalance {
-                        Text(hideBalances ? "•••• €" : pending.formattedAsGermanCurrency())
-                            .font(.system(size: 36, weight: .black, design: .rounded))
-                            .foregroundColor(pending < 0 ? .themeDanger : .themeSuccess)
-                            .padding(.top, 4)
-                        Text("Vorgemerkte Gesamtsumme")
-                            .font(.caption2)
-                            .foregroundColor(.themeTextSecondary)
-                            .textCase(.uppercase)
-                            .tracking(1)
-                    }
-                }
-                .padding(.vertical, 24)
-                .frame(maxWidth: .infinity)
-                .background(Color.themeBgSecondary)
-                
-                // Info Callout Box (Warning/Info)
-                HStack(spacing: 12) {
-                    Image(systemName: "info.circle.fill")
-                        .foregroundColor(.themeAccent)
-                        .font(.title3)
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Vorgemerkte Umsätze")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.themeTextPrimary)
-                        Text("Diese Buchungen sind noch nicht endgültig von der Bank gebucht. Sie werden lokal zwischengespeichert und nicht nach Actual Budget übertragen.")
-                            .font(.caption)
-                            .foregroundColor(.themeTextSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .padding()
-                .background(Color.themeAccent.opacity(0.06))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.themeAccent.opacity(0.15), lineWidth: 1)
-                )
-                .padding(.horizontal)
-                .padding(.bottom, 16)
-
-                // Scrollable List of Transactions
-                ScrollView {
-                    VStack(spacing: 12) {
-                        if let transactions = account.pendingTransactions, !transactions.isEmpty {
-                            ForEach(transactions) { tx in
-                                pendingTransactionRow(tx: tx)
-                            }
-                        } else {
-                            VStack(spacing: 8) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 40))
-                                    .foregroundColor(.themeSuccess)
-                                Text("Keine vorgemerkten Umsätze")
-                                    .font(.headline)
-                                    .foregroundColor(.themeTextPrimary)
-                            }
-                            .padding(.vertical, 40)
-                        }
-                    }
-                    .padding(.horizontal)
-                }
-                
-                Spacer()
-            }
-            .background(Color.themeBgPrimary)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Schließen") {
-                        dismiss()
-                    }
-                    .fontWeight(.semibold)
-                    .tint(.themeAccent)
-                }
-            }
-        }
-    }
-
-    private func formatIban(_ iban: String) -> String {
-        var result = ""
-        for (idx, char) in iban.enumerated() {
-            if idx > 0 && idx % 4 == 0 {
-                result += " "
-            }
-            result += String(char)
-        }
-        return result
-    }
-
-    @ViewBuilder
-    private func pendingTransactionRow(tx: PendingTransaction) -> some View {
-        let isExpanded = expandedTransactionIds.contains(tx.id)
-        
-        Button(action: {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                if isExpanded {
-                    expandedTransactionIds.remove(tx.id)
-                } else {
-                    expandedTransactionIds.insert(tx.id)
-                }
-            }
-        }) {
-            HStack(spacing: 12) {
-                Circle()
-                    .fill(Color.themeAccent.opacity(0.08))
-                    .frame(width: 40, height: 40)
-                    .overlay(
-                        Image(systemName: tx.isCredit ? "arrow.down.left.circle.fill" : "creditcard.fill")
-                            .foregroundColor(.themeAccent)
-                            .font(.system(size: 16))
-                    )
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(tx.payee)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.themeTextPrimary)
-                        .lineLimit(1)
-                    
-                    Text(tx.purpose)
-                        .font(.caption2)
-                        .foregroundColor(.themeTextSecondary)
-                        .lineLimit(isExpanded ? nil : 2)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: isExpanded)
-                    
-                    Text("Wertstellung: \(formatDate(tx.valueDate))")
-                        .font(.system(size: 9))
-                        .foregroundColor(.themeTextSecondary)
-                        .padding(.top, 2)
-                }
-                
-                Spacer()
-                
-                Text(hideBalances ? "•••• €" : (tx.isCredit ? tx.amount : -tx.amount).formattedAsGermanCurrency())
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                    .foregroundColor(tx.isCredit ? .themeSuccess : .themeTextPrimary)
-            }
-            .padding()
-            .background(Color.themeCardBg)
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.themeCardBorder, lineWidth: 1)
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-
-    private func formatDate(_ dateStr: String) -> String {
-        let inputFormatter = DateFormatter()
-        inputFormatter.dateFormat = "yyyy-MM-dd"
-        guard let date = inputFormatter.date(from: dateStr) else { return dateStr }
-        
-        let outputFormatter = DateFormatter()
         outputFormatter.dateFormat = "dd.MM.yyyy"
         return outputFormatter.string(from: date)
     }

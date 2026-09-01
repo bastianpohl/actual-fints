@@ -72,7 +72,7 @@ struct ImportedTransaction: Codable, Identifiable, Equatable {
     let account: String
     let payee: String
     let amount: Double
-    let status: String // "added", "updated", "ignored" or "pending"
+    let status: String // "added", "updated", or "ignored"
 }
 
 struct SyncResponse: Codable {
@@ -129,16 +129,6 @@ struct LogRun: Identifiable, Equatable {
     let errorMessage: String?
 }
 
-struct PendingTransaction: Codable, Identifiable, Equatable {
-    let id: String
-    let amount: Double
-    let isCredit: Bool
-    let valueDate: String
-    let entryDate: String?
-    let payee: String
-    let purpose: String
-}
-
 struct AccountBalance: Codable, Identifiable, Equatable {
     var id: String { iban }
     let iban: String
@@ -146,8 +136,6 @@ struct AccountBalance: Codable, Identifiable, Equatable {
     let productName: String?
     let balance: Double
     let actualBalance: Double?
-    let pendingBalance: Double?
-    let pendingTransactions: [PendingTransaction]?
     let currency: String
     let bankName: String
     let lastUpdated: String

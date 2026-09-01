@@ -4,10 +4,6 @@ const { applyHisalPatch } = require('./fints-hisal-patch');
 applyHisalPatch();
 
 const { PinTanClient } = require('fints');
-const { HKKAZ, HKTAN } = require('fints/dist/segments');
-const { HIKAZ } = require('fints/dist/segments/hikaz');
-const { read } = require('mt940-js');
-const { parse86Structured } = require('fints/dist/mt940-86-structured');
 
 class FinTSClient {
 
@@ -116,102 +112,6 @@ class FinTSClient {
          throw new Error("Client not initialized");
       }
       return await this.#client.balance(account);
-   }
-
-   async getPendingTransactions(fromDate, toDate) {
-      if (!this.#activeAccount) {
-         throw new Error("No active account set");
-      }
-      if (!this.#client) {
-         throw new Error("Client not initialized");
-      }
-
-      try {
-         const dialog = this.#client.createDialog();
-         await dialog.sync();
-         await dialog.init();
-
-         const segments = [];
-         segments.push(new HKKAZ({
-            segNo: 3,
-            version: dialog.hikazsVersion,
-            account: this.#activeAccount,
-            startDate: fromDate,
-            endDate: toDate,
-         }));
-
-         if (dialog.hktanVersion >= 6) {
-            segments.push(new HKTAN({
-               segNo: 4,
-               version: 6,
-               process: "4",
-               segmentReference: "HKKAZ",
-               medium: dialog.tanMethods[0].name,
-            }));
-         }
-
-         let touchdowns;
-         let touchdown;
-         const responses = [];
-         do {
-            const request = this.#client.createRequest(dialog, segments);
-            const response = await dialog.send(request);
-            touchdowns = response.getTouchdowns(request);
-            touchdown = touchdowns.get("HKKAZ");
-            responses.push(response);
-         } while (touchdown);
-
-         await dialog.end();
-
-         const responseSegments = responses.reduce((result, response) => {
-            result.push(...response.findSegments(HIKAZ));
-            return result;
-         }, []);
-
-         let pendingString = responseSegments.map((segment) => segment.pendingTransactions || "").join("");
-         if (!pendingString.trim()) {
-            return [];
-         }
-
-         // Inject mock opening balance if not present to satisfy mt940-js parser requirement
-         if (!pendingString.includes(':60F:') && !pendingString.includes(':60M:')) {
-            const now = new Date();
-            const yy = String(now.getFullYear()).slice(-2);
-            const mm = String(now.getMonth() + 1).padStart(2, '0');
-            const dd = String(now.getDate()).padStart(2, '0');
-            const yymmdd = `${yy}${mm}${dd}`;
-            
-            const mockOpeningBalance = `:60F:C${yymmdd}EUR0,00\r\n`;
-            
-            // Insert it right before the first ':61:' tag
-            const idx = pendingString.indexOf(':61:');
-            if (idx !== -1) {
-               pendingString = pendingString.slice(0, idx) + mockOpeningBalance + pendingString.slice(idx);
-            }
-         }
-
-         const unprocessedStatements = await read(Buffer.from(pendingString, "utf-8"));
-         const parsedStatements = unprocessedStatements.map((statement) => {
-            const transactions = statement.transactions.map((transaction) => {
-               const descriptionStructured = parse86Structured(transaction.description);
-               return Object.assign(Object.assign({}, transaction), { descriptionStructured });
-            });
-            return Object.assign(Object.assign({}, statement), { transactions });
-         });
-
-         const allTransactions = [];
-         for (const stmt of parsedStatements) {
-            if (stmt.transactions && Array.isArray(stmt.transactions)) {
-               for (const tx of stmt.transactions) {
-                  allTransactions.push(tx);
-               }
-            }
-         }
-         return allTransactions;
-      } catch (error) {
-         console.error("Error fetching pending statements:", error);
-         throw error;
-      }
    }
 
 }

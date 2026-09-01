@@ -1,13 +1,7 @@
 const api = require('@actual-app/api');
 const Database = require('better-sqlite3');
-const { PENDING_ID_PREFIX } = require('./convert');
 const fs = require('node:fs');
 const path = require('node:path');
-
-// Transactions imported as pending (vorgemerkt) bookings are preliminary: they must not
-// count towards the balance that is compared against the booked bank balance, and they
-// must never be marked as reconciled.
-const EXCLUDE_PENDING_SQL = `AND (financial_id IS NULL OR financial_id NOT LIKE '${PENDING_ID_PREFIX}%')`;
 
 function getDatabasePath(dataDir) {
    if (!fs.existsSync(dataDir)) return null;
@@ -37,11 +31,10 @@ function getAccountBalanceFromDb(dataDir, accountId) {
    const db = new Database(dbPath);
    try {
       const row = db.prepare(`
-         SELECT SUM(amount) FROM transactions 
-         WHERE acct = ? 
-           AND tombstone = 0 
+         SELECT SUM(amount) FROM transactions
+         WHERE acct = ?
+           AND tombstone = 0
            AND isChild = 0
-           ${EXCLUDE_PENDING_SQL}
       `).get(accountId);
       const sum = row ? row['SUM(amount)'] : 0;
       return (sum || 0) / 100.0;
@@ -78,11 +71,10 @@ async function reconcileAccountIfSynchronized(accountId, actualAccountName, bank
       try {
          // Query working balance of the account (sum of normal + parent transactions, excluding child transactions of splits)
          const balanceRow = db.prepare(`
-            SELECT SUM(amount) FROM transactions 
-            WHERE acct = ? 
-              AND tombstone = 0 
+            SELECT SUM(amount) FROM transactions
+            WHERE acct = ?
+              AND tombstone = 0
               AND isChild = 0
-              ${EXCLUDE_PENDING_SQL}
          `).get(accountId);
          const budgetSum = balanceRow ? balanceRow['SUM(amount)'] : 0;
          budgetBalance = (budgetSum || 0) / 100.0; // in Euro
@@ -94,27 +86,23 @@ async function reconcileAccountIfSynchronized(accountId, actualAccountName, bank
          }
          
          // Query uncategorized transactions (including child transactions of splits)
-         const uncatQuery = `
-            SELECT id FROM transactions 
-            WHERE acct = ? 
-              AND category IS NULL 
-              AND transferred_id IS NULL 
-              AND isParent = 0 
+         uncatTxs = db.prepare(`
+            SELECT id FROM transactions
+            WHERE acct = ?
+              AND category IS NULL
+              AND transferred_id IS NULL
+              AND isParent = 0
               AND tombstone = 0
-              ${EXCLUDE_PENDING_SQL}
-         `;
-         uncatTxs = db.prepare(uncatQuery).all(accountId);
+         `).all(accountId);
          
          // Query unreconciled transactions (excluding child transactions of splits, since they can't be reconciled directly)
-         const unreconciledQuery = `
-            SELECT id FROM transactions 
-            WHERE acct = ? 
-              AND reconciled = 0 
-              AND isChild = 0 
+         unreconciledTxs = db.prepare(`
+            SELECT id FROM transactions
+            WHERE acct = ?
+              AND reconciled = 0
+              AND isChild = 0
               AND tombstone = 0
-              ${EXCLUDE_PENDING_SQL}
-         `;
-         unreconciledTxs = db.prepare(unreconciledQuery).all(accountId);
+         `).all(accountId);
       } finally {
          db.close();
       }

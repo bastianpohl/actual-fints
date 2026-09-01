@@ -501,8 +501,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const isCredit = tx.amount > 0;
                         const amountClass = isCredit ? 'credit' : 'debit';
                         const badgeMap = {
-                           added: { cls: 'added', text: 'Hinzugefügt' },
-                           pending: { cls: 'pending', text: 'Vorgemerkt' }
+                           added: { cls: 'added', text: 'Hinzugefügt' }
                         };
                         const badge = badgeMap[tx.status] || { cls: 'ignored', text: 'Bereits importiert' };
                         const badgeClass = badge.cls;

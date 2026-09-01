@@ -835,11 +835,6 @@ header {
    color: var(--text-muted);
 }
 
-.status-badge-inline.pending {
-   background: rgba(245, 158, 11, 0.15);
-   color: var(--warning, #f59e0b);
-}
-
 /* --- Smartphone & iOS Optimizations (< 600px) --- */
 @media (max-width: 600px) {
    /* Header & Segmented Tab Navigation - Hiding top bar, centering header */

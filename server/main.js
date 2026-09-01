@@ -7,91 +7,7 @@ const { CredentialsStore } = require('./lib/credentials-store');
 const { maskIban } = require('./utils/mask');
 
 const parseDateRange = require('./utils/parseDateRange');
-const { splitAlreadyBookedPending } = require('./utils/pending');
 const { sendSuccessNotification, sendFailureNotification, sendWarningNotification } = require('./utils/notifications');
-
-// Pending (vorgemerkte) bookings are always current, therefore they are fetched for a
-// fixed window instead of the booked date range (which defaults to today only).
-const PENDING_WINDOW_DAYS = Number(process.env.PENDING_DAYS) > 0 ? Number(process.env.PENDING_DAYS) : 30;
-const isPendingImportEnabled = () => !['false', '0', 'no'].includes(String(process.env.IMPORT_PENDING ?? 'true').toLowerCase());
-
-const shiftIsoDate = (isoDate, days) => {
-   const date = new Date(`${isoDate}T00:00:00Z`);
-   if (Number.isNaN(date.getTime())) return isoDate;
-   date.setUTCDate(date.getUTCDate() + days);
-   return date.toISOString().slice(0, 10);
-};
-
-/**
- * Synchronizes the pending (vorgemerkte) bookings of the currently active account with
- * Actual Budget: bookings the bank no longer reports as pending are deleted, still
- * pending ones keep their existing transaction (and thus their category, payee and
- * notes), new ones are imported as uncleared transactions.
- *
- * @returns {Promise<{added: number, removed: number, categoriesTransferred: number, unchanged: number, alreadyBooked: number, details: Array}>}
- */
-const syncPendingTransactions = async (fintsClient, budgetClient) => {
-   const toDate = new Date();
-   const fromDate = new Date(Date.now() - PENDING_WINDOW_DAYS * 24 * 60 * 60 * 1000);
-
-   const pendingTransactions = await fintsClient.getPendingTransactions(fromDate, toDate);
-
-   const converted = [];
-   for (const transaction of pendingTransactions || []) {
-      try {
-         converted.push(budgetClient.convertPending(transaction));
-      } catch (convertErr) {
-         console.error('Vorgemerkte Buchung übersprungen:', convertErr.message);
-      }
-   }
-
-   // The booked transactions are needed twice: to skip pending bookings the bank already
-   // delivered as a booking, and to carry categories over to them
-   const today = toDate.toISOString().slice(0, 10);
-   let lookbackDate = shiftIsoDate(today, -(PENDING_WINDOW_DAYS + 7));
-   if (converted.length > 0) {
-      const earliestDate = shiftIsoDate(converted.reduce((min, t) => (t.date < min ? t.date : min), converted[0].date), -7);
-      if (earliestDate < lookbackDate) lookbackDate = earliestDate;
-   }
-   const bookedRows = await budgetClient.getBookedTransactionsSince(lookbackDate);
-
-   // Skip pending bookings that the bank already delivered as a booked transaction
-   let fresh = [];
-   let duplicates = [];
-   if (converted.length > 0) {
-      ({ fresh, duplicates } = splitAlreadyBookedPending(converted, bookedRows));
-   }
-
-   // Everything the bank still reports as pending stays, the rest is removed - and hands
-   // its category over to the booking it turned into
-   const stillPendingIds = new Set(fresh.map(t => t.imported_id));
-   const { removed, categoriesTransferred } = await budgetClient.deleteObsoletePendingImports(stillPendingIds, bookedRows);
-
-   if (fresh.length === 0) {
-      return { added: 0, removed, categoriesTransferred, unchanged: 0, alreadyBooked: duplicates.length, details: [] };
-   }
-
-   // Already imported pending bookings are matched by their imported_id and left as they are
-   const importResult = await budgetClient.importTransactions(fresh);
-   const addedIds = new Set((importResult?.added ?? []).map(t => t.imported_id));
-   const addedTransactions = fresh.filter(t => addedIds.has(t.imported_id));
-
-   const details = addedTransactions.map(t => ({
-      date: t.date,
-      payee: t.payee_name || 'Unbekannter Empfänger',
-      amount: t.amount,
-      status: 'pending'
-   }));
-
-   return {
-      added: addedTransactions.length,
-      removed,
-      categoriesTransferred,
-      unchanged: fresh.length - addedTransactions.length,
-      alreadyBooked: duplicates.length,
-      details
-   };
-};
 
 const main = async () => {
 
@@ -156,10 +72,6 @@ const main = async () => {
    }
 
    const results = [];
-   const pendingImportEnabled = isPendingImportEnabled();
-   if (!pendingImportEnabled) {
-      console.error('Import der vorgemerkten Umsätze ist per IMPORT_PENDING deaktiviert.');
-   }
 
    for (const bank of banks) {
       console.error(`\n── Bank: ${bank.name} ──`);
@@ -293,30 +205,7 @@ const main = async () => {
 
             }
 
-            // Synchronize the currently pending (vorgemerkte) bookings as uncleared transactions
-            let pendingAdded = 0;
-            let pendingRemoved = 0;
-            let pendingCategoriesTransferred = 0;
-            if (pendingImportEnabled) {
-               try {
-                  const pendingResult = await syncPendingTransactions(fintsClient, budgetClient);
-                  pendingAdded = pendingResult.added;
-                  pendingRemoved = pendingResult.removed;
-                  pendingCategoriesTransferred = pendingResult.categoriesTransferred;
-                  txDetails = txDetails.concat(pendingResult.details);
-                  if (pendingAdded > 0 || pendingRemoved > 0 || pendingResult.unchanged > 0 || pendingResult.alreadyBooked > 0) {
-                     console.error(`Vorgemerkte Buchungen: ${pendingAdded} neu, ${pendingResult.unchanged} unverändert, ${pendingRemoved} nicht mehr vorgemerkt und entfernt, ${pendingResult.alreadyBooked} bereits gebucht.`);
-                  }
-                  if (pendingResult.categoriesTransferred > 0) {
-                     console.error(`Kategorien von Vormerkungen auf die gebuchten Umsätze übernommen: ${pendingResult.categoriesTransferred}`);
-                  }
-               } catch (pendingErr) {
-                  // Without a fresh pending list nothing is deleted - the existing pending bookings stay untouched
-                  console.error(`Fehler beim Abgleich der vorgemerkten Umsätze für ${maskIban(accountMapping.iban)}:`, pendingErr.message);
-               }
-            }
-
-            const accountChanged = budgetTransactions.length > 0 || pendingAdded > 0 || pendingRemoved > 0 || pendingCategoriesTransferred > 0;
+            const accountChanged = budgetTransactions.length > 0;
 
             if (accountChanged) {
                const accountResult = {
@@ -324,9 +213,6 @@ const main = async () => {
                   added,
                   updated,
                   ignored: budgetTransactions.length - added,
-                  pendingAdded,
-                  pendingRemoved,
-                  pendingCategoriesTransferred,
                   transactions: txDetails
                };
 
@@ -349,7 +235,6 @@ const main = async () => {
                }
 
                // Trigger automatic reconciliation if account balance is synchronized and all transactions are categorized
-               // (pending bookings are excluded from both the balance and the reconciliation)
                try {
                   const bal = await fintsClient.getBalance(matchedFintsAccount);
                   const activeAccountId = budgetClient.getActiveAccountId();
@@ -367,18 +252,6 @@ const main = async () => {
    }
 
    await budgetClient.close();
-
-   const fs = require('node:fs');
-   const path = require('node:path');
-   const pendingCachePath = path.join(__dirname, 'pending-transactions.json');
-   if (fs.existsSync(pendingCachePath)) {
-      try {
-         fs.unlinkSync(pendingCachePath);
-         console.error('Deleted pending transactions cache because new booked transactions were synced.');
-      } catch (unlinkErr) {
-         console.error('Error deleting pending-transactions.json:', unlinkErr.message);
-      }
-   }
 
    return results;
 }

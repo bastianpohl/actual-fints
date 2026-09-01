@@ -3,8 +3,7 @@ const assert = require('assert/strict');
 
 const { decodeText } = require('../utils/decodeText');
 const { isUid } = require('../utils/uid')
-const { convertAmount, getNotes, getPayeeName, convertTransaction, convertPendingTransaction, PENDING_ID_PREFIX } = require ('../utils/convert');
-const { splitAlreadyBookedPending, matchPendingToBooked, selectObsoletePendingImports, dateIntToIso, payeesMatch, amountsMatch } = require('../utils/pending');
+const { convertAmount, getNotes, getPayeeName, convertTransaction } = require ('../utils/convert');
 const { requireEnv } = require('../utils/env');
 const parseDateRange = require('../utils/parseDateRange');
 
@@ -269,11 +268,6 @@ test('getAccountBalanceFromDb correctly sums only normal and parent transactions
      'tx-child-3b', accountId, 4000, 0, 1, 0
   );
 
-  // 5. Imported pending booking (uncleared, preliminary): must not count towards the balance
-  db.prepare('INSERT INTO transactions (id, acct, amount, isParent, isChild, tombstone, financial_id) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
-     'tx-pending-4', accountId, 2500, 0, 0, 0, 'pending-abc123'
-  );
-
   db.close();
 
   // Call the function
@@ -291,138 +285,6 @@ test('getAccountBalanceFromDb correctly sums only normal and parent transactions
 
 
 
-
-
-test('convertPendingTransaction marks the transaction as uncleared and prefixes the imported_id', () => {
-  const transaction = {
-    id: 'abc123',
-    amount: 12.54,
-    isCredit: false,
-    valueDate: '2026-06-10',
-    entryDate: '2026-06-19',
-    descriptionStructured: { name: 'Lidl', reference: { text: 'Kaufumsatz' } },
-  };
-
-  const converted = convertPendingTransaction(transaction, 'acc-1');
-
-  assert.equal(converted.account, 'acc-1');
-  assert.equal(converted.amount, -1254);
-  assert.equal(converted.cleared, false);
-  assert.equal(converted.imported_id, `${PENDING_ID_PREFIX}abc123`);
-  // The value date is closer to the eventual booking date than the entry date
-  assert.equal(converted.date, '2026-06-10');
-  assert.ok(converted.notes.startsWith('⏳ Vorgemerkt'));
-});
-
-test('convertPendingTransaction falls back to the entry date', () => {
-  const converted = convertPendingTransaction(
-    { id: 'x', amount: 5, isCredit: true, entryDate: '2026-06-19' },
-    'acc-1'
-  );
-  assert.equal(converted.date, '2026-06-19');
-  assert.equal(converted.amount, 500);
-});
-
-test('convertPendingTransaction rejects transactions without a usable date', () => {
-  assert.throws(
-    () => convertPendingTransaction({ id: 'x', amount: 5, isCredit: true }, 'acc-1'),
-    /valid valueDate or entryDate/
-  );
-});
-
-test('dateIntToIso converts Actual date integers', () => {
-  assert.equal(dateIntToIso(20260610), '2026-06-10');
-  assert.equal(dateIntToIso('not-a-date'), null);
-});
-
-test('payeesMatch compares normalized payee names', () => {
-  assert.equal(payeesMatch('EDK*Getraenke Bruss', 'edk getraenke bruss'), true);
-  assert.equal(payeesMatch('Lidl sagt Danke', 'Aldi Sued'), false);
-  assert.equal(payeesMatch('', 'Lidl'), false);
-});
-
-test('payeesMatch ignores the card scheme prefix booked card payments carry', () => {
-  // Pending list vs booked transaction of the same card payment
-  assert.equal(payeesMatch('Easypark Gmbh Easypark.De', 'Visa Easypark Gmbh'), true);
-  assert.equal(payeesMatch('Homemagasinet Stor-Malmoe', 'Visa Homemagasinet'), true);
-  assert.equal(payeesMatch('Brobizz.Com Kopenhavn V', 'Visa Brobizz.Com'), true);
-  assert.equal(payeesMatch('Paypal *Wow 8b66f Live-Sp4029357733', 'Visa Paypal *Wow 8b66f Live'), true);
-  // Different merchants stay unmatched
-  assert.equal(payeesMatch('Zettle *Loshult Handel Loshult', 'Visa Vaddo'), false);
-  assert.equal(payeesMatch('Lidl sagt Danke Gelsenkirchen', 'Visa Aldi Sued'), false);
-});
-
-test('splitAlreadyBookedPending skips pending bookings that already arrived as booked', () => {
-  const pending = [
-    { amount: -1254, date: '2026-06-10', payee_name: 'Lidl Gelsenkirchen' },
-    { amount: -2176, date: '2026-06-11', payee_name: 'Aldi Sued' },
-  ];
-  const booked = [
-    { amount: -1254, date: 20260612, payee: 'Lidl Gelsenkirchen' },
-  ];
-
-  const { fresh, duplicates } = splitAlreadyBookedPending(pending, booked);
-
-  assert.equal(duplicates.length, 1);
-  assert.equal(fresh.length, 1);
-  assert.equal(fresh[0].payee_name, 'Aldi Sued');
-});
-
-test('splitAlreadyBookedPending keeps pending bookings outside the date window', () => {
-  const pending = [{ amount: -1254, date: '2026-06-10', payee_name: 'Lidl' }];
-  const booked = [{ amount: -1254, date: 20260601, payee: 'Lidl' }];
-
-  const { fresh, duplicates } = splitAlreadyBookedPending(pending, booked);
-
-  assert.equal(fresh.length, 1);
-  assert.equal(duplicates.length, 0);
-});
-
-test('splitAlreadyBookedPending consumes each booked transaction only once', () => {
-  const pending = [
-    { amount: -1000, date: '2026-06-10', payee_name: 'Rewe' },
-    { amount: -1000, date: '2026-06-10', payee_name: 'Rewe' },
-  ];
-  const booked = [{ amount: -1000, date: 20260610, payee: 'Rewe' }];
-
-  const { fresh, duplicates } = splitAlreadyBookedPending(pending, booked);
-
-  assert.equal(duplicates.length, 1);
-  assert.equal(fresh.length, 1);
-});
-
-
-test('selectObsoletePendingImports keeps bookings the bank still reports as pending', () => {
-  const existing = [
-    { id: 'tx-a', imported_id: 'pending-aaa' },
-    { id: 'tx-b', imported_id: 'pending-bbb' },
-    { id: 'tx-c', imported_id: 'pending-ccc' },
-  ];
-
-  const obsolete = selectObsoletePendingImports(existing, new Set(['pending-aaa', 'pending-ccc']));
-
-  assert.equal(obsolete.length, 1);
-  assert.equal(obsolete[0].id, 'tx-b');
-});
-
-test('selectObsoletePendingImports removes everything when nothing is pending anymore', () => {
-  const existing = [{ id: 'tx-a', imported_id: 'pending-aaa' }];
-
-  assert.equal(selectObsoletePendingImports(existing, new Set()).length, 1);
-  assert.equal(selectObsoletePendingImports([], new Set(['pending-aaa'])).length, 0);
-});
-
-test('selectObsoletePendingImports accepts an array of ids', () => {
-  const existing = [
-    { id: 'tx-a', imported_id: 'pending-aaa' },
-    { id: 'tx-b', imported_id: 'pending-bbb' },
-  ];
-
-  const obsolete = selectObsoletePendingImports(existing, ['pending-bbb']);
-
-  assert.equal(obsolete.length, 1);
-  assert.equal(obsolete[0].imported_id, 'pending-aaa');
-});
 
 
 test('applyHisalPatch tolerates HISAL segments without optional balance groups', () => {
@@ -470,107 +332,4 @@ test('applyHisalPatch still reads complete HISAL segments', () => {
   assert.equal(segment.pendingBalance, 50);
   assert.equal(segment.creditLimit, 2000);
   assert.equal(segment.availableBalance, 2950);
-});
-
-
-test('matchPendingToBooked pairs a categorized pending booking with the booking it turned into', () => {
-  const pendingRows = [
-    { id: 'p-1', amount: -1254, date: 20260610, payee: 'Lidl Gelsenkirchen', category: 'cat-lebensmittel' },
-  ];
-  const bookedRows = [
-    { id: 'b-1', amount: -1254, date: 20260615, payee: 'Lidl Gelsenkirchen', category: null },
-  ];
-
-  const pairs = matchPendingToBooked(pendingRows, bookedRows);
-
-  assert.equal(pairs.length, 1);
-  assert.equal(pairs[0].booked.id, 'b-1');
-  assert.equal(pairs[0].pending.category, 'cat-lebensmittel');
-});
-
-test('matchPendingToBooked never overwrites an existing category', () => {
-  const pendingRows = [{ id: 'p-1', amount: -1254, date: 20260610, payee: 'Lidl', category: 'cat-a' }];
-  const bookedRows = [{ id: 'b-1', amount: -1254, date: 20260612, payee: 'Lidl', category: 'cat-b' }];
-
-  assert.equal(matchPendingToBooked(pendingRows, bookedRows).length, 0);
-});
-
-test('matchPendingToBooked ignores pending bookings without a category', () => {
-  const pendingRows = [{ id: 'p-1', amount: -1254, date: 20260610, payee: 'Lidl', category: null }];
-  const bookedRows = [{ id: 'b-1', amount: -1254, date: 20260612, payee: 'Lidl', category: null }];
-
-  assert.equal(matchPendingToBooked(pendingRows, bookedRows).length, 0);
-});
-
-test('matchPendingToBooked requires amount, payee and a nearby date', () => {
-  const pending = [{ id: 'p-1', amount: -1254, date: 20260610, payee: 'Lidl', category: 'cat-a' }];
-
-  // clearly different amount
-  assert.equal(matchPendingToBooked(pending, [{ id: 'b', amount: -2500, date: 20260611, payee: 'Lidl', category: null }]).length, 0);
-  // a few cents apart is treated as the same booking (foreign currency conversion)
-  assert.equal(matchPendingToBooked(pending, [{ id: 'b', amount: -1249, date: 20260611, payee: 'Lidl', category: null }]).length, 1);
-  // different payee
-  assert.equal(matchPendingToBooked(pending, [{ id: 'b', amount: -1254, date: 20260611, payee: 'Aldi Sued', category: null }]).length, 0);
-  // too far away in time (default window is 7 days)
-  assert.equal(matchPendingToBooked(pending, [{ id: 'b', amount: -1254, date: 20260620, payee: 'Lidl', category: null }]).length, 0);
-  // within the window
-  assert.equal(matchPendingToBooked(pending, [{ id: 'b', amount: -1254, date: 20260617, payee: 'Lidl', category: null }]).length, 1);
-});
-
-test('matchPendingToBooked uses each booked transaction only once', () => {
-  const pendingRows = [
-    { id: 'p-1', amount: -1000, date: 20260610, payee: 'Rewe', category: 'cat-a' },
-    { id: 'p-2', amount: -1000, date: 20260610, payee: 'Rewe', category: 'cat-b' },
-  ];
-  const bookedRows = [{ id: 'b-1', amount: -1000, date: 20260611, payee: 'Rewe', category: null }];
-
-  const pairs = matchPendingToBooked(pendingRows, bookedRows);
-
-  assert.equal(pairs.length, 1);
-  assert.equal(pairs[0].pending.id, 'p-1');
-});
-
-
-test('amountsMatch accepts the exchange rate deviation of foreign currency bookings', () => {
-  // Real examples: pending amount announced, slightly different amount booked
-  assert.equal(amountsMatch(-652, -655, false), true);
-  assert.equal(amountsMatch(-3032, -3043, false), true);
-  assert.equal(amountsMatch(-39177, -39312, false), true);
-  // The separate fee booking of the same payment must not match
-  assert.equal(amountsMatch(-862, -39312, false), false);
-  // 5 % apart is beyond the tolerance
-  assert.equal(amountsMatch(-1000, -1050, false), false);
-  // Opposite signs never match
-  assert.equal(amountsMatch(500, -500, false), false);
-});
-
-test('amountsMatch stays strict when an exact match is requested', () => {
-  assert.equal(amountsMatch(-652, -655, true), false);
-  assert.equal(amountsMatch(-655, -655, true), true);
-});
-
-test('matchPendingToBooked prefers the exactly matching amount', () => {
-  const pendingRows = [{ id: 'p-1', amount: -3043, date: 20260819, payee: 'Ica Nara Granna Granna', category: 'cat-a' }];
-  const bookedRows = [
-    { id: 'b-fx', amount: -3032, date: 20260821, payee: 'Visa Ica Nara Granna', category: null },
-    { id: 'b-exact', amount: -3043, date: 20260821, payee: 'Visa Ica Nara Granna', category: null },
-  ];
-
-  const pairs = matchPendingToBooked(pendingRows, bookedRows);
-
-  assert.equal(pairs.length, 1);
-  assert.equal(pairs[0].booked.id, 'b-exact');
-});
-
-test('matchPendingToBooked pairs a foreign currency booking with its converted amount', () => {
-  const pendingRows = [{ id: 'p-1', amount: -3043, date: 20260819, payee: 'Ica Nara Granna Granna', category: 'cat-a' }];
-  const bookedRows = [
-    { id: 'b-fee', amount: -67, date: 20260821, payee: 'Visa Ica Nara Granna', category: null },
-    { id: 'b-fx', amount: -3032, date: 20260821, payee: 'Visa Ica Nara Granna', category: null },
-  ];
-
-  const pairs = matchPendingToBooked(pendingRows, bookedRows);
-
-  assert.equal(pairs.length, 1);
-  assert.equal(pairs[0].booked.id, 'b-fx');
 });
