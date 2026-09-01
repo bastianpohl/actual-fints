@@ -4,7 +4,7 @@ const assert = require('assert/strict');
 const { decodeText } = require('../utils/decodeText');
 const { isUid } = require('../utils/uid')
 const { convertAmount, getNotes, getPayeeName, convertTransaction, convertPendingTransaction, PENDING_ID_PREFIX } = require ('../utils/convert');
-const { splitAlreadyBookedPending, matchPendingToBooked, selectObsoletePendingImports, dateIntToIso, payeesMatch } = require('../utils/pending');
+const { splitAlreadyBookedPending, matchPendingToBooked, selectObsoletePendingImports, dateIntToIso, payeesMatch, amountsMatch } = require('../utils/pending');
 const { requireEnv } = require('../utils/env');
 const parseDateRange = require('../utils/parseDateRange');
 
@@ -492,4 +492,49 @@ test('matchPendingToBooked uses each booked transaction only once', () => {
 
   assert.equal(pairs.length, 1);
   assert.equal(pairs[0].pending.id, 'p-1');
+});
+
+
+test('amountsMatch accepts the exchange rate deviation of foreign currency bookings', () => {
+  // Real examples: pending amount announced, slightly different amount booked
+  assert.equal(amountsMatch(-652, -655, false), true);
+  assert.equal(amountsMatch(-3032, -3043, false), true);
+  assert.equal(amountsMatch(-39177, -39312, false), true);
+  // The separate fee booking of the same payment must not match
+  assert.equal(amountsMatch(-862, -39312, false), false);
+  // 5 % apart is beyond the tolerance
+  assert.equal(amountsMatch(-1000, -1050, false), false);
+  // Opposite signs never match
+  assert.equal(amountsMatch(500, -500, false), false);
+});
+
+test('amountsMatch stays strict when an exact match is requested', () => {
+  assert.equal(amountsMatch(-652, -655, true), false);
+  assert.equal(amountsMatch(-655, -655, true), true);
+});
+
+test('matchPendingToBooked prefers the exactly matching amount', () => {
+  const pendingRows = [{ id: 'p-1', amount: -3043, date: 20260819, payee: 'Ica Nara Granna Granna', category: 'cat-a' }];
+  const bookedRows = [
+    { id: 'b-fx', amount: -3032, date: 20260821, payee: 'Visa Ica Nara Granna', category: null },
+    { id: 'b-exact', amount: -3043, date: 20260821, payee: 'Visa Ica Nara Granna', category: null },
+  ];
+
+  const pairs = matchPendingToBooked(pendingRows, bookedRows);
+
+  assert.equal(pairs.length, 1);
+  assert.equal(pairs[0].booked.id, 'b-exact');
+});
+
+test('matchPendingToBooked pairs a foreign currency booking with its converted amount', () => {
+  const pendingRows = [{ id: 'p-1', amount: -3043, date: 20260819, payee: 'Ica Nara Granna Granna', category: 'cat-a' }];
+  const bookedRows = [
+    { id: 'b-fee', amount: -67, date: 20260821, payee: 'Visa Ica Nara Granna', category: null },
+    { id: 'b-fx', amount: -3032, date: 20260821, payee: 'Visa Ica Nara Granna', category: null },
+  ];
+
+  const pairs = matchPendingToBooked(pendingRows, bookedRows);
+
+  assert.equal(pairs.length, 1);
+  assert.equal(pairs[0].booked.id, 'b-fx');
 });

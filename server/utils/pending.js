@@ -81,19 +81,40 @@ const buildBookedCandidates = bookedRows =>
       payee: row.payee,
    }));
 
+// Card payments in a foreign currency are booked with a slightly different euro amount
+// than the pending list announced, because the exchange rate is applied at booking time
+// (e.g. pending -30,43 EUR becomes -30,32 EUR plus a separate fee booking).
+const AMOUNT_TOLERANCE_PERCENT = 0.02;
+const AMOUNT_TOLERANCE_CAP = 500; // cents
+
+/** Same amount, or close enough for a converted foreign currency booking. */
+const amountsMatch = (bookedAmount, pendingAmount, exact) => {
+   if (bookedAmount === pendingAmount) return true;
+   if (exact) return false;
+   if (!bookedAmount || !pendingAmount) return false;
+   if (Math.sign(bookedAmount) !== Math.sign(pendingAmount)) return false;
+
+   const tolerance = Math.min(Math.abs(pendingAmount) * AMOUNT_TOLERANCE_PERCENT, AMOUNT_TOLERANCE_CAP);
+   return Math.abs(bookedAmount - pendingAmount) <= tolerance;
+};
+
 /**
- * Finds the booked transaction that corresponds to a pending booking: same amount, a date
- * within the given window and a matching payee. Each booked transaction is matched once.
+ * Finds the booked transaction that corresponds to a pending booking: matching amount, a
+ * date within the given window and a matching payee. Each booked transaction is matched
+ * once. An exactly matching amount always wins over one that is only within tolerance.
  */
-const findBookedCandidate = (candidates, consumed, pending, dayWindow) =>
-   candidates.find(candidate => {
+const findBookedCandidate = (candidates, consumed, pending, dayWindow) => {
+   const search = exact => candidates.find(candidate => {
       if (consumed.has(candidate.index)) return false;
-      if (candidate.amount !== pending.amount) return false;
+      if (!amountsMatch(candidate.amount, pending.amount, exact)) return false;
       if (!candidate.date || !pending.date) return false;
       const distance = daysBetween(candidate.date, pending.date);
       if (distance === null || distance > dayWindow) return false;
       return payeesMatch(candidate.payee, pending.payee ?? pending.payee_name);
    });
+
+   return search(true) || search(false);
+};
 
 /**
  * Splits converted pending transactions into those that should be imported and those
@@ -169,6 +190,7 @@ const selectObsoletePendingImports = (existingRows, stillPendingIds) => {
 };
 
 module.exports = {
+   amountsMatch,
    dateIntToIso,
    daysBetween,
    normalizePayee,
