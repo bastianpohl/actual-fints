@@ -471,8 +471,10 @@ test('matchPendingToBooked ignores pending bookings without a category', () => {
 test('matchPendingToBooked requires amount, payee and a nearby date', () => {
   const pending = [{ id: 'p-1', amount: -1254, date: 20260610, payee: 'Lidl', category: 'cat-a' }];
 
-  // different amount
-  assert.equal(matchPendingToBooked(pending, [{ id: 'b', amount: -1255, date: 20260611, payee: 'Lidl', category: null }]).length, 0);
+  // clearly different amount
+  assert.equal(matchPendingToBooked(pending, [{ id: 'b', amount: -2500, date: 20260611, payee: 'Lidl', category: null }]).length, 0);
+  // a few cents apart is treated as the same booking (foreign currency conversion)
+  assert.equal(matchPendingToBooked(pending, [{ id: 'b', amount: -1249, date: 20260611, payee: 'Lidl', category: null }]).length, 1);
   // different payee
   assert.equal(matchPendingToBooked(pending, [{ id: 'b', amount: -1254, date: 20260611, payee: 'Aldi Sued', category: null }]).length, 0);
   // too far away in time (default window is 7 days)
