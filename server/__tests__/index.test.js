@@ -307,6 +307,17 @@ test('payeesMatch compares normalized payee names', () => {
   assert.equal(payeesMatch('', 'Lidl'), false);
 });
 
+test('payeesMatch ignores the card scheme prefix booked card payments carry', () => {
+  // Pending list vs booked transaction of the same card payment
+  assert.equal(payeesMatch('Easypark Gmbh Easypark.De', 'Visa Easypark Gmbh'), true);
+  assert.equal(payeesMatch('Homemagasinet Stor-Malmoe', 'Visa Homemagasinet'), true);
+  assert.equal(payeesMatch('Brobizz.Com Kopenhavn V', 'Visa Brobizz.Com'), true);
+  assert.equal(payeesMatch('Paypal *Wow 8b66f Live-Sp4029357733', 'Visa Paypal *Wow 8b66f Live'), true);
+  // Different merchants stay unmatched
+  assert.equal(payeesMatch('Zettle *Loshult Handel Loshult', 'Visa Vaddo'), false);
+  assert.equal(payeesMatch('Lidl sagt Danke Gelsenkirchen', 'Visa Aldi Sued'), false);
+});
+
 test('splitAlreadyBookedPending skips pending bookings that already arrived as booked', () => {
   const pending = [
     { amount: -1254, date: '2026-06-10', payee_name: 'Lidl Gelsenkirchen' },

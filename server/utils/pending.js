@@ -23,12 +23,39 @@ const daysBetween = (isoA, isoB) => {
    return Math.abs(a - b) / MS_PER_DAY;
 };
 
-/** Reduces a payee name to a comparable form (lowercase, alphanumeric only). */
-const normalizePayee = name =>
-   String(name ?? '')
+// Card payments arrive with a scheme prefix once they are booked ("Visa Easypark Gmbh"),
+// while the pending list carries the plain merchant name including its location
+// ("Easypark Gmbh Easypark.De"). Stripping the prefix makes both comparable.
+const CARD_PREFIXES = [
+   'kartenzahlung',
+   'mastercard',
+   'kreditkarte',
+   'debitkarte',
+   'girocard',
+   'maestro',
+   'master',
+   'visa',
+   'vpay',
+];
+
+/**
+ * Reduces a payee name to a comparable form: lowercase, alphanumeric only and without a
+ * leading card scheme prefix.
+ */
+const normalizePayee = name => {
+   let value = String(name ?? '')
       .toLowerCase()
-      .replace(/[^a-z0-9äöüß]/g, '')
-      .slice(0, 24);
+      .replace(/[^a-z0-9äöüß]/g, '');
+
+   for (const prefix of CARD_PREFIXES) {
+      if (value.startsWith(prefix) && value.length - prefix.length >= 3) {
+         value = value.slice(prefix.length);
+         break;
+      }
+   }
+
+   return value.slice(0, 24);
+};
 
 const payeesMatch = (a, b) => {
    const left = normalizePayee(a);
