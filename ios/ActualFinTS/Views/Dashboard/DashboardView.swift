@@ -12,9 +12,18 @@ struct DashboardView: View {
     @State private var syncError: String? = nil
     @State private var hasSynced = false
     
-    @State private var limitDateRange = true
+    // Off by default: the server already imports a rolling window that reaches a few days
+    // into the past, which is what catches bookings the bank posts backdated (card fees,
+    // foreign currency charges). Narrowing it down to a single day used to lose those for
+    // good, so a custom range is now the exception the user opts into.
+    @State private var limitDateRange = false
     @State private var startDate = Date()
     @State private var endDate = Date()
+    /// Mirrors the server default so the date pickers open on the same range.
+    @State private var syncLookbackDays = DashboardView.fallbackLookbackDays
+
+    /// Used until the server reported its own value via `/api/status`.
+    private static let fallbackLookbackDays = 7
     
     @State private var accountBalances: [AccountBalance] = []
     @State private var isLoadingBalances = false
@@ -226,7 +235,14 @@ struct DashboardView: View {
                                 .foregroundColor(.themeTextPrimary)
                         }
                         .tint(.themeAccent)
-                        
+                        // Single-parameter form: the two-parameter onChange needs iOS 17,
+                        // the deployment target is iOS 16.
+                        .onChange(of: limitDateRange) { isOn in
+                            // Start the custom range on the same window the server would
+                            // have used, so switching it on changes nothing by itself.
+                            if isOn { resetDateRangeToServerDefault() }
+                        }
+
                         if limitDateRange {
                             VStack(spacing: 10) {
                                 DatePicker("Startdatum", selection: $startDate, displayedComponents: .date)
@@ -235,6 +251,11 @@ struct DashboardView: View {
                                     .font(.subheadline)
                             }
                             .padding(.top, 5)
+                        } else {
+                            Text("Standard: die letzten \(syncLookbackDays) Tage. Der Puffer fängt Buchungen ab, die die Bank nachträglich rückdatiert einstellt.")
+                                .font(.caption)
+                                .foregroundColor(.themeTextSecondary)
+                                .lineLimit(nil)
                         }
                     }
                     .padding()
@@ -455,10 +476,22 @@ struct DashboardView: View {
         do {
             let fetchedStatus = try await networkManager.fetchStatus()
             status = fetchedStatus
+            if let lookback = fetchedStatus.syncLookbackDays, lookback >= 0 {
+                syncLookbackDays = lookback
+                // Only while the user has not opened a custom range - their own dates win.
+                if !limitDateRange { resetDateRangeToServerDefault() }
+            }
             LocalCacheManager.shared.save(fetchedStatus, to: "status.json")
         } catch {
             print("Failed to fetch status: \(error)")
         }
+    }
+
+    /// Puts the date pickers on the same window the server uses without an explicit range.
+    private func resetDateRangeToServerDefault() {
+        let today = Date()
+        endDate = today
+        startDate = Calendar.current.date(byAdding: .day, value: -syncLookbackDays, to: today) ?? today
     }
     
     private func loadBalances() async {

@@ -961,12 +961,17 @@ app.get('/api/status', (req, res) => {
       actualBudgetConfigured = !!(process.env.AB_URL && process.env.AB_PASS && process.env.AB_SYNC_DB);
    }
 
+   const { getLookbackDays } = require('./utils/parseDateRange');
+
    const status = {
       actualBudgetConfigured,
       masterKeyConfigured: !!masterKey,
       bankCount,
       accountCount,
       lastSync: null,
+      // Days the server looks back when a sync is triggered without an explicit range.
+      // Clients prefill their date pickers with it so they match the server default.
+      syncLookbackDays: getLookbackDays(),
    };
 
    if (dbError) {

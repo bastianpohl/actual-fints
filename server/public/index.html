@@ -145,10 +145,13 @@
                         <input type="date" id="sync-end-date" class="input-field">
                      </div>
                   </div>
+                  <p id="sync-range-hint" style="color: var(--text-secondary); font-size: 0.8rem; margin: 0 0 0.5rem 0;">
+                     Leer lassen für den Standard-Zeitraum. Der Puffer fängt Buchungen ab, die die Bank nachträglich rückdatiert einstellt.
+                  </p>
                </div>
 
                <div class="sync-action-row" style="margin-top:0.5rem;">
-                  <span style="font-size:0.85rem; color:var(--text-secondary);" id="sync-info-msg">Wähle Zeitspanne oder lasse Felder leer für "Heute".</span>
+                  <span style="font-size:0.85rem; color:var(--text-secondary);" id="sync-info-msg">Wähle eine Zeitspanne oder lasse die Felder leer für den Standard-Zeitraum.</span>
                   <button class="btn" id="start-sync-btn">
                      <span class="material-icons btn-icon">bolt</span> Sync starten
                   </button>

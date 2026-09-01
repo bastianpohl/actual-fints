@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
    const gitUpdateBtn = document.getElementById('git-update-btn');
    const syncRunningSpinner = document.getElementById('sync-running-spinner');
    const syncInfoMsg = document.getElementById('sync-info-msg');
+   const syncRangeHint = document.getElementById('sync-range-hint');
 
    // Sync Results Table Elements
    const syncResultsCard = document.getElementById('sync-results-card');
@@ -258,6 +259,14 @@ document.addEventListener('DOMContentLoaded', () => {
              statusActualText.textContent = 'Konfig-Fehler';
           }
  
+          // Name the actual default range instead of hardcoding it, so the hint follows
+          // the server's SYNC_LOOKBACK_DAYS setting
+          if (syncRangeHint && Number.isFinite(data.syncLookbackDays)) {
+             const days = data.syncLookbackDays;
+             const window = days === 0 ? 'heute' : `die letzten ${days} Tage`;
+             syncRangeHint.textContent = `Leer lassen für den Standard-Zeitraum (${window}). Der Puffer fängt Buchungen ab, die die Bank nachträglich rückdatiert einstellt.`;
+          }
+
           // Mapped banks badge
           statusDbText.textContent = `${data.bankCount} Banken (${data.accountCount} Konten)`;
           if (data.bankCount > 0) {

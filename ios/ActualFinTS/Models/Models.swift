@@ -11,6 +11,9 @@ struct ServerStatus: Codable {
     let lastCronSyncLog: String?
     let nextCronSync: String?
     let dbError: String?
+    /// Days the server reaches into the past when a sync runs without an explicit range.
+    /// Optional so the app keeps working against servers that predate the field.
+    let syncLookbackDays: Int?
 }
 
 struct FinTSDetails: Codable, Equatable {

@@ -111,14 +111,48 @@ test('parseDateRange still honors legacy --start/--end flags', t => {
   assert.equal(endDate.toISOString(), new Date('2025-03-15').toISOString());
 });
 
-test('parseDateRange defaults to current day for start date when arguments are missing', t => {
-  const defaultEndDate = new Date();
-  const defaultStartDate = new Date();
+test('parseDateRange looks a week back by default so backdated bookings are still picked up', t => {
+  const originalLookback = process.env.SYNC_LOOKBACK_DAYS;
+  delete process.env.SYNC_LOOKBACK_DAYS;
+  t.after(() => {
+    if (originalLookback === undefined) delete process.env.SYNC_LOOKBACK_DAYS;
+    else process.env.SYNC_LOOKBACK_DAYS = originalLookback;
+  });
 
   const { startDate, endDate } = parseDateRange();
 
-  assert.equal(startDate.toISOString(), defaultStartDate.toISOString());
-  assert.equal(endDate.toISOString(), defaultEndDate.toISOString());
+  const expectedStart = new Date();
+  expectedStart.setDate(expectedStart.getDate() - parseDateRange.DEFAULT_LOOKBACK_DAYS);
+
+  assert.equal(startDate.toISOString().slice(0, 10), expectedStart.toISOString().slice(0, 10));
+  assert.equal(endDate.toISOString().slice(0, 10), new Date().toISOString().slice(0, 10));
+});
+
+test('parseDateRange honors SYNC_LOOKBACK_DAYS for the default range', t => {
+  const originalLookback = process.env.SYNC_LOOKBACK_DAYS;
+  process.env.SYNC_LOOKBACK_DAYS = '30';
+  t.after(() => {
+    if (originalLookback === undefined) delete process.env.SYNC_LOOKBACK_DAYS;
+    else process.env.SYNC_LOOKBACK_DAYS = originalLookback;
+  });
+
+  const { startDate } = parseDateRange();
+
+  const expectedStart = new Date();
+  expectedStart.setDate(expectedStart.getDate() - 30);
+
+  assert.equal(startDate.toISOString().slice(0, 10), expectedStart.toISOString().slice(0, 10));
+});
+
+test('parseDateRange falls back to the default when SYNC_LOOKBACK_DAYS is not a usable number', t => {
+  const originalLookback = process.env.SYNC_LOOKBACK_DAYS;
+  process.env.SYNC_LOOKBACK_DAYS = 'nonsense';
+  t.after(() => {
+    if (originalLookback === undefined) delete process.env.SYNC_LOOKBACK_DAYS;
+    else process.env.SYNC_LOOKBACK_DAYS = originalLookback;
+  });
+
+  assert.equal(parseDateRange.getLookbackDays(), parseDateRange.DEFAULT_LOOKBACK_DAYS);
 });
 
 test('parseDateRange throws when end date precedes start date', t => {
