@@ -42,6 +42,33 @@ const payeesMatch = (a, b) => {
 };
 
 /**
+ * Prepares booked transactions for matching: normalizes the date and keeps the original
+ * row so callers can access ids, categories and everything else they selected.
+ */
+const buildBookedCandidates = bookedRows =>
+   (bookedRows || []).map((row, index) => ({
+      index,
+      row,
+      amount: row.amount,
+      date: typeof row.date === 'string' ? row.date : dateIntToIso(row.date),
+      payee: row.payee,
+   }));
+
+/**
+ * Finds the booked transaction that corresponds to a pending booking: same amount, a date
+ * within the given window and a matching payee. Each booked transaction is matched once.
+ */
+const findBookedCandidate = (candidates, consumed, pending, dayWindow) =>
+   candidates.find(candidate => {
+      if (consumed.has(candidate.index)) return false;
+      if (candidate.amount !== pending.amount) return false;
+      if (!candidate.date || !pending.date) return false;
+      const distance = daysBetween(candidate.date, pending.date);
+      if (distance === null || distance > dayWindow) return false;
+      return payeesMatch(candidate.payee, pending.payee ?? pending.payee_name);
+   });
+
+/**
  * Splits converted pending transactions into those that should be imported and those
  * that already exist as a booked transaction in Actual Budget.
  *
@@ -55,23 +82,10 @@ const splitAlreadyBookedPending = (pendingTransactions, bookedRows, options = {}
    const fresh = [];
    const duplicates = [];
    const consumed = new Set();
-
-   const candidates = (bookedRows || []).map((row, index) => ({
-      index,
-      amount: row.amount,
-      date: typeof row.date === 'string' ? row.date : dateIntToIso(row.date),
-      payee: row.payee,
-   }));
+   const candidates = buildBookedCandidates(bookedRows);
 
    for (const transaction of pendingTransactions || []) {
-      const match = candidates.find(candidate => {
-         if (consumed.has(candidate.index)) return false;
-         if (candidate.amount !== transaction.amount) return false;
-         if (!candidate.date) return false;
-         const distance = daysBetween(candidate.date, transaction.date);
-         if (distance === null || distance > dayWindow) return false;
-         return payeesMatch(candidate.payee, transaction.payee_name);
-      });
+      const match = findBookedCandidate(candidates, consumed, transaction, dayWindow);
 
       if (match) {
          consumed.add(match.index);
@@ -82,6 +96,36 @@ const splitAlreadyBookedPending = (pendingTransactions, bookedRows, options = {}
    }
 
    return { fresh, duplicates };
+};
+
+/**
+ * Pairs pending imports that are about to be deleted with the booked transaction they
+ * turned into, so a category assigned to the pending booking can be carried over.
+ *
+ * Only pairs where the pending booking actually carries a category and the booked
+ * transaction has none are returned - an existing category is never overwritten.
+ *
+ * @param {Array<{id:string,amount:number,date:number|string,payee:string,category:string|null}>} pendingRows
+ * @param {Array<{id:string,amount:number,date:number|string,payee:string,category:string|null}>} bookedRows
+ * @param {{dayWindow?: number}} [options]
+ * @returns {Array<{pending: object, booked: object}>}
+ */
+const matchPendingToBooked = (pendingRows, bookedRows, options = {}) => {
+   const dayWindow = options.dayWindow ?? 7;
+   const consumed = new Set();
+   const candidates = buildBookedCandidates(bookedRows).filter(candidate => !candidate.row.category);
+   const pairs = [];
+
+   for (const row of pendingRows || []) {
+      if (!row.category) continue;
+      const pending = { ...row, date: typeof row.date === 'string' ? row.date : dateIntToIso(row.date) };
+      const match = findBookedCandidate(candidates, consumed, pending, dayWindow);
+      if (!match) continue;
+      consumed.add(match.index);
+      pairs.push({ pending: row, booked: match.row });
+   }
+
+   return pairs;
 };
 
 /**
@@ -103,5 +147,6 @@ module.exports = {
    normalizePayee,
    payeesMatch,
    splitAlreadyBookedPending,
+   matchPendingToBooked,
    selectObsoletePendingImports,
 };

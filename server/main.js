@@ -28,7 +28,7 @@ const shiftIsoDate = (isoDate, days) => {
  * pending ones keep their existing transaction (and thus their category, payee and
  * notes), new ones are imported as uncleared transactions.
  *
- * @returns {Promise<{added: number, removed: number, unchanged: number, alreadyBooked: number, details: Array}>}
+ * @returns {Promise<{added: number, removed: number, categoriesTransferred: number, unchanged: number, alreadyBooked: number, details: Array}>}
  */
 const syncPendingTransactions = async (fintsClient, budgetClient) => {
    const toDate = new Date();
@@ -45,21 +45,30 @@ const syncPendingTransactions = async (fintsClient, budgetClient) => {
       }
    }
 
+   // The booked transactions are needed twice: to skip pending bookings the bank already
+   // delivered as a booking, and to carry categories over to them
+   const today = toDate.toISOString().slice(0, 10);
+   let lookbackDate = shiftIsoDate(today, -(PENDING_WINDOW_DAYS + 7));
+   if (converted.length > 0) {
+      const earliestDate = shiftIsoDate(converted.reduce((min, t) => (t.date < min ? t.date : min), converted[0].date), -7);
+      if (earliestDate < lookbackDate) lookbackDate = earliestDate;
+   }
+   const bookedRows = await budgetClient.getBookedTransactionsSince(lookbackDate);
+
    // Skip pending bookings that the bank already delivered as a booked transaction
    let fresh = [];
    let duplicates = [];
    if (converted.length > 0) {
-      const earliestDate = converted.reduce((min, t) => (t.date < min ? t.date : min), converted[0].date);
-      const bookedRows = await budgetClient.getBookedTransactionsSince(shiftIsoDate(earliestDate, -7));
       ({ fresh, duplicates } = splitAlreadyBookedPending(converted, bookedRows));
    }
 
-   // Everything the bank still reports as pending stays, the rest is removed
+   // Everything the bank still reports as pending stays, the rest is removed - and hands
+   // its category over to the booking it turned into
    const stillPendingIds = new Set(fresh.map(t => t.imported_id));
-   const { removed } = await budgetClient.deleteObsoletePendingImports(stillPendingIds);
+   const { removed, categoriesTransferred } = await budgetClient.deleteObsoletePendingImports(stillPendingIds, bookedRows);
 
    if (fresh.length === 0) {
-      return { added: 0, removed, unchanged: 0, alreadyBooked: duplicates.length, details: [] };
+      return { added: 0, removed, categoriesTransferred, unchanged: 0, alreadyBooked: duplicates.length, details: [] };
    }
 
    // Already imported pending bookings are matched by their imported_id and left as they are
@@ -77,6 +86,7 @@ const syncPendingTransactions = async (fintsClient, budgetClient) => {
    return {
       added: addedTransactions.length,
       removed,
+      categoriesTransferred,
       unchanged: fresh.length - addedTransactions.length,
       alreadyBooked: duplicates.length,
       details
@@ -286,14 +296,19 @@ const main = async () => {
             // Synchronize the currently pending (vorgemerkte) bookings as uncleared transactions
             let pendingAdded = 0;
             let pendingRemoved = 0;
+            let pendingCategoriesTransferred = 0;
             if (pendingImportEnabled) {
                try {
                   const pendingResult = await syncPendingTransactions(fintsClient, budgetClient);
                   pendingAdded = pendingResult.added;
                   pendingRemoved = pendingResult.removed;
+                  pendingCategoriesTransferred = pendingResult.categoriesTransferred;
                   txDetails = txDetails.concat(pendingResult.details);
                   if (pendingAdded > 0 || pendingRemoved > 0 || pendingResult.unchanged > 0 || pendingResult.alreadyBooked > 0) {
                      console.error(`Vorgemerkte Buchungen: ${pendingAdded} neu, ${pendingResult.unchanged} unverändert, ${pendingRemoved} nicht mehr vorgemerkt und entfernt, ${pendingResult.alreadyBooked} bereits gebucht.`);
+                  }
+                  if (pendingResult.categoriesTransferred > 0) {
+                     console.error(`Kategorien von Vormerkungen auf die gebuchten Umsätze übernommen: ${pendingResult.categoriesTransferred}`);
                   }
                } catch (pendingErr) {
                   // Without a fresh pending list nothing is deleted - the existing pending bookings stay untouched
@@ -301,7 +316,7 @@ const main = async () => {
                }
             }
 
-            const accountChanged = budgetTransactions.length > 0 || pendingAdded > 0 || pendingRemoved > 0;
+            const accountChanged = budgetTransactions.length > 0 || pendingAdded > 0 || pendingRemoved > 0 || pendingCategoriesTransferred > 0;
 
             if (accountChanged) {
                const accountResult = {
@@ -311,6 +326,7 @@ const main = async () => {
                   ignored: budgetTransactions.length - added,
                   pendingAdded,
                   pendingRemoved,
+                  pendingCategoriesTransferred,
                   transactions: txDetails
                };
 

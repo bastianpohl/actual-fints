@@ -7,7 +7,7 @@ if (typeof globalThis.navigator === 'undefined') {
 const api = require('@actual-app/api');
 const { isUid } = require('../utils/uid');
 const { convertTransaction, convertPendingTransaction, PENDING_ID_PREFIX } = require('../utils/convert');
-const { selectObsoletePendingImports } = require('../utils/pending');
+const { selectObsoletePendingImports, matchPendingToBooked } = require('../utils/pending');
 const { requireEnv } = require('../utils/env');
 
 class BudgetClient {
@@ -178,9 +178,10 @@ class BudgetClient {
 
    /**
     * Returns the transactions of the active account that were created by a previous
-    * pending import (imported_id prefixed with "pending-").
+    * pending import (imported_id prefixed with "pending-"), including the category the
+    * user may have assigned to them.
     *
-    * @returns {Promise<Array<{id: string, imported_id: string}>>}
+    * @returns {Promise<Array<{id: string, imported_id: string, amount: number, date: number, payee: string, category: string|null}>>}
     */
    async getPendingImports() {
       await this.#initClient();
@@ -189,14 +190,22 @@ class BudgetClient {
       const db = this.#openDatabase();
       if (!db) return [];
       try {
-         const rows = db.prepare(`
-            SELECT id, financial_id FROM transactions
-            WHERE acct = ?
-              AND tombstone = 0
-              AND isChild = 0
-              AND financial_id LIKE ?
+         return db.prepare(`
+            SELECT t.id AS id,
+                   t.financial_id AS imported_id,
+                   t.amount AS amount,
+                   t.date AS date,
+                   COALESCE(cm.transferId, t.category) AS category,
+                   COALESCE(NULLIF(t.imported_description, ''), p.name, '') AS payee
+            FROM transactions t
+            LEFT JOIN category_mapping cm ON cm.id = t.category
+            LEFT JOIN payee_mapping pm ON pm.id = t.description
+            LEFT JOIN payees p ON p.id = COALESCE(pm.targetId, t.description)
+            WHERE t.acct = ?
+              AND t.tombstone = 0
+              AND t.isChild = 0
+              AND t.financial_id LIKE ?
          `).all(this.#activeAccount, `${PENDING_ID_PREFIX}%`);
-         return rows.map(row => ({ id: row.id, imported_id: row.financial_id }));
       } catch (error) {
          console.warn(`[budget-api] Vorgemerkte Buchungen konnten nicht gelesen werden: ${error.message}`);
          return [];
@@ -211,12 +220,29 @@ class BudgetClient {
     * category, payee or note the user assigned in Actual Budget. Manually entered
     * uncleared transactions are never touched.
     *
+    * Before a pending booking is removed it is matched against the booked transactions of
+    * the account. If it turned into a booked transaction that has no category yet, the
+    * category assigned to the pending booking is carried over, so categorizing a pending
+    * booking is not lost once the bank books it.
+    *
     * @param {Set<string>|Array<string>} stillPendingIds imported_ids that are still pending.
-    * @returns {Promise<{removed: number, kept: number}>}
+    * @param {Array<object>} [bookedRows] Booked transactions of the account (see getBookedTransactionsSince).
+    * @returns {Promise<{removed: number, kept: number, categoriesTransferred: number}>}
     */
-   async deleteObsoletePendingImports(stillPendingIds) {
+   async deleteObsoletePendingImports(stillPendingIds, bookedRows = []) {
       const existing = await this.getPendingImports();
       const obsolete = selectObsoletePendingImports(existing, stillPendingIds);
+
+      // Carry the category of a pending booking over to the booking it turned into
+      let categoriesTransferred = 0;
+      for (const { pending, booked } of matchPendingToBooked(obsolete, bookedRows)) {
+         try {
+            await api.updateTransaction(booked.id, { category: pending.category });
+            categoriesTransferred++;
+         } catch (error) {
+            console.warn(`[budget-api] Kategorie der Vormerkung ${pending.id} konnte nicht übernommen werden: ${error.message}`);
+         }
+      }
 
       let removed = 0;
       for (const row of obsolete) {
@@ -227,7 +253,7 @@ class BudgetClient {
             console.warn(`[budget-api] Vorgemerkte Buchung ${row.id} konnte nicht gelöscht werden: ${error.message}`);
          }
       }
-      return { removed, kept: existing.length - removed };
+      return { removed, kept: existing.length - removed, categoriesTransferred };
    }
 
    /**
@@ -235,7 +261,7 @@ class BudgetClient {
     * used to detect pending bookings that already arrived as a real booking.
     *
     * @param {string} sinceDate Date in YYYY-MM-DD format.
-    * @returns {Promise<Array<{amount:number,date:number,payee:string}>>}
+    * @returns {Promise<Array<{id:string,amount:number,date:number,category:string|null,payee:string}>>}
     */
    async getBookedTransactionsSince(sinceDate) {
       await this.#initClient();
@@ -246,10 +272,13 @@ class BudgetClient {
       try {
          const dateInt = Number(String(sinceDate).replace(/-/g, ''));
          return db.prepare(`
-            SELECT t.amount AS amount,
+            SELECT t.id AS id,
+                   t.amount AS amount,
                    t.date AS date,
+                   COALESCE(cm.transferId, t.category) AS category,
                    COALESCE(NULLIF(t.imported_description, ''), p.name, '') AS payee
             FROM transactions t
+            LEFT JOIN category_mapping cm ON cm.id = t.category
             LEFT JOIN payee_mapping pm ON pm.id = t.description
             LEFT JOIN payees p ON p.id = COALESCE(pm.targetId, t.description)
             WHERE t.acct = ?

@@ -4,7 +4,7 @@ const assert = require('assert/strict');
 const { decodeText } = require('../utils/decodeText');
 const { isUid } = require('../utils/uid')
 const { convertAmount, getNotes, getPayeeName, convertTransaction, convertPendingTransaction, PENDING_ID_PREFIX } = require ('../utils/convert');
-const { splitAlreadyBookedPending, selectObsoletePendingImports, dateIntToIso, payeesMatch } = require('../utils/pending');
+const { splitAlreadyBookedPending, matchPendingToBooked, selectObsoletePendingImports, dateIntToIso, payeesMatch } = require('../utils/pending');
 const { requireEnv } = require('../utils/env');
 const parseDateRange = require('../utils/parseDateRange');
 
@@ -425,4 +425,60 @@ test('applyHisalPatch still reads complete HISAL segments', () => {
   assert.equal(segment.pendingBalance, 50);
   assert.equal(segment.creditLimit, 2000);
   assert.equal(segment.availableBalance, 2950);
+});
+
+
+test('matchPendingToBooked pairs a categorized pending booking with the booking it turned into', () => {
+  const pendingRows = [
+    { id: 'p-1', amount: -1254, date: 20260610, payee: 'Lidl Gelsenkirchen', category: 'cat-lebensmittel' },
+  ];
+  const bookedRows = [
+    { id: 'b-1', amount: -1254, date: 20260615, payee: 'Lidl Gelsenkirchen', category: null },
+  ];
+
+  const pairs = matchPendingToBooked(pendingRows, bookedRows);
+
+  assert.equal(pairs.length, 1);
+  assert.equal(pairs[0].booked.id, 'b-1');
+  assert.equal(pairs[0].pending.category, 'cat-lebensmittel');
+});
+
+test('matchPendingToBooked never overwrites an existing category', () => {
+  const pendingRows = [{ id: 'p-1', amount: -1254, date: 20260610, payee: 'Lidl', category: 'cat-a' }];
+  const bookedRows = [{ id: 'b-1', amount: -1254, date: 20260612, payee: 'Lidl', category: 'cat-b' }];
+
+  assert.equal(matchPendingToBooked(pendingRows, bookedRows).length, 0);
+});
+
+test('matchPendingToBooked ignores pending bookings without a category', () => {
+  const pendingRows = [{ id: 'p-1', amount: -1254, date: 20260610, payee: 'Lidl', category: null }];
+  const bookedRows = [{ id: 'b-1', amount: -1254, date: 20260612, payee: 'Lidl', category: null }];
+
+  assert.equal(matchPendingToBooked(pendingRows, bookedRows).length, 0);
+});
+
+test('matchPendingToBooked requires amount, payee and a nearby date', () => {
+  const pending = [{ id: 'p-1', amount: -1254, date: 20260610, payee: 'Lidl', category: 'cat-a' }];
+
+  // different amount
+  assert.equal(matchPendingToBooked(pending, [{ id: 'b', amount: -1255, date: 20260611, payee: 'Lidl', category: null }]).length, 0);
+  // different payee
+  assert.equal(matchPendingToBooked(pending, [{ id: 'b', amount: -1254, date: 20260611, payee: 'Aldi Sued', category: null }]).length, 0);
+  // too far away in time (default window is 7 days)
+  assert.equal(matchPendingToBooked(pending, [{ id: 'b', amount: -1254, date: 20260620, payee: 'Lidl', category: null }]).length, 0);
+  // within the window
+  assert.equal(matchPendingToBooked(pending, [{ id: 'b', amount: -1254, date: 20260617, payee: 'Lidl', category: null }]).length, 1);
+});
+
+test('matchPendingToBooked uses each booked transaction only once', () => {
+  const pendingRows = [
+    { id: 'p-1', amount: -1000, date: 20260610, payee: 'Rewe', category: 'cat-a' },
+    { id: 'p-2', amount: -1000, date: 20260610, payee: 'Rewe', category: 'cat-b' },
+  ];
+  const bookedRows = [{ id: 'b-1', amount: -1000, date: 20260611, payee: 'Rewe', category: null }];
+
+  const pairs = matchPendingToBooked(pendingRows, bookedRows);
+
+  assert.equal(pairs.length, 1);
+  assert.equal(pairs[0].pending.id, 'p-1');
 });
