@@ -218,19 +218,20 @@ const main = async () => {
 
                results.push(accountResult);
 
+               // Nur bei tatsächlich importierten Umsätzen benachrichtigen (Cron läuft stündlich)
                if (added > 0) {
                   try {
                      await sendSuccessNotification([accountResult]);
                   } catch (notificationErr) {
                      console.error('Fehler beim Senden der Erfolgsbenachrichtigung:', notificationErr.message);
                   }
-               }
 
-               if (warnings.length > 0) {
-                  try {
-                     await sendWarningNotification(warnings);
-                  } catch (warningErr) {
-                     console.error('Fehler beim Senden der Warnungsbenachrichtigung:', warningErr.message);
+                  if (warnings.length > 0) {
+                     try {
+                        await sendWarningNotification(warnings);
+                     } catch (warningErr) {
+                        console.error('Fehler beim Senden der Warnungsbenachrichtigung:', warningErr.message);
+                     }
                   }
                }
 

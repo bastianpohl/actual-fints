@@ -101,30 +101,24 @@ async function sendSuccessNotification(results) {
    const accountsWithNew = results.filter(r => r.added > 0);
    const totalAdded = results.reduce((sum, r) => sum + r.added, 0);
 
-   let title = '';
-   let message = '';
+   // Keine Benachrichtigung, wenn nichts importiert wurde
+   if (totalAdded === 0) return;
 
-   if (totalAdded > 0) {
-      title = totalAdded === 1 ? '1 neuer Umsatz importiert 🏦' : `${totalAdded} neue Umsätze importiert 🏦`;
+   const title = totalAdded === 1 ? '1 neuer Umsatz importiert 🏦' : `${totalAdded} neue Umsätze importiert 🏦`;
 
-      const lines = [];
-      for (const res of accountsWithNew) {
-         lines.push(`💳 ${res.account}:`);
-         const newTransactions = res.transactions.filter(t => t.status === 'added');
-         for (const tx of newTransactions) {
-            const formattedAmt = formatAmount(tx.amount);
-            const formattedDate = formatDate(tx.date);
-            lines.push(`  • ${formattedDate} ${tx.payee}: ${formattedAmt}`);
-         }
-         lines.push('');
+   const lines = [];
+   for (const res of accountsWithNew) {
+      lines.push(`💳 ${res.account}:`);
+      const newTransactions = res.transactions.filter(t => t.status === 'added');
+      for (const tx of newTransactions) {
+         const formattedAmt = formatAmount(tx.amount);
+         const formattedDate = formatDate(tx.date);
+         lines.push(`  • ${formattedDate} ${tx.payee}: ${formattedAmt}`);
       }
-
-      message = lines.join('\n').trim();
-   } else {
-      // Silent notification for successful run without any new transactions
-      title = 'FinTS-Import erfolgreich 🔄';
-      message = 'Alle Konten sind auf dem neuesten Stand. Keine neuen Umsätze gefunden.';
+      lines.push('');
    }
+
+   const message = lines.join('\n').trim();
 
    // Send via native Web-Push (PWA)
    try {
