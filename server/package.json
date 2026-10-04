@@ -10,6 +10,9 @@
   "license": "ISC",
   "author": "Bastian Pohl",
   "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
   "main": "main.js",
   "scripts": {
     "setup": "node --env-file=.env setup.js",
