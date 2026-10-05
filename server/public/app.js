@@ -453,66 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
    // 4. Fetch & render Logs (tabellarische Lauf-Übersicht)
    let logRuns = [];
-   let rawLogText = '';
    let runFilter = 'all';
-
-   const ERROR_RE = /fehler|error|failed|unhandled|nicht gesetzt|keine banken/i;
-   const DUMP_RE = /^[\w$]+: |^[{}\[\]],?$/;
-   const WARN_RE = /kein fints|keine fints|warnung|warning|fehl-match|übersprungen|deduplizierungs/i;
-
-   // Zerlegt sync.log in einzelne Läufe (Cron und manuell)
-   const parseLogRuns = (raw) => {
-      const runs = [];
-      const headerRe = /^\[(.*?)\] --- (CRON SYNC START|SYNC START)(?: \(Range: (.*?) to (.*?)\))? ---\s*$/;
-      let cur = null;
-      let section = 'stdout';
-      const finish = () => { if (cur) runs.push(finishRun(cur)); cur = null; };
-      for (const line of raw.split('\n')) {
-         const m = line.match(headerRe);
-         if (m) {
-            finish();
-            cur = { timestamp: m[1], cron: m[2] === 'CRON SYNC START', range: m[3] ? `${m[3]} – ${m[4]}` : '', stdout: [], stderr: [] };
-            section = 'stdout';
-         } else if (cur) {
-            const t = line.trim();
-            if (t === 'STDOUT:') section = 'stdout';
-            else if (t === 'STDERR:') section = 'stderr';
-            else if (t === '--- SYNC END ---') finish();
-            else if (section === 'stderr' && /^EXIT: /.test(t)) cur.exit = t.slice(6);
-            else cur[section].push(line);
-         }
-      }
-      finish();
-      return runs.reverse();
-   };
-
-   const finishRun = (r) => {
-      const stdout = r.stdout.join('\n').trim();
-      const stderr = r.stderr.join('\n').trim();
-      let results = [];
-      for (const l of r.stdout) {
-         const t = l.trim();
-         if (t.startsWith('[') && t.endsWith(']')) {
-            try { const parsed = JSON.parse(t); if (Array.isArray(parsed)) results = parsed; } catch (e) { /* kein JSON */ }
-         }
-      }
-      const errors = [];
-      const warnings = [];
-      for (const l of [...r.stderr, ...r.stdout]) {
-         const t = l.trim();
-         if (!t || (t.startsWith('[') && t.endsWith(']') && t.length > 2 && t[1] === '{')) continue;
-         // Objekt-Dumps der Actual-Bibliothek (eingerückt bzw. "key: value,") sind keine Meldungen
-         if (/^\s/.test(l) || DUMP_RE.test(t)) continue;
-         if (t.startsWith('[Reconciliation-Fehler]') || (ERROR_RE.test(t) && !WARN_RE.test(t))) errors.push(t);
-         else if (WARN_RE.test(t)) warnings.push(t);
-      }
-      if (r.exit !== undefined && r.exit !== '0') {
-         errors.unshift(`Prozess mit Exit-Code ${r.exit} beendet`);
-      }
-      const added = results.reduce((n, a) => n + (a.added || 0), 0);
-      const ignored = results.reduce((n, a) => n + (a.ignored || 0), 0);
-      return { ...r, stdout, stderr, results, errors, warnings, added, ignored };
-   };
 
    const fmtEuro = (cents) => (cents / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
 
@@ -576,10 +517,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
    const loadLogs = async () => {
       try {
-         const res = await fetch('/api/logs');
-         const data = await res.json();
-         rawLogText = data.logs || '';
-         logRuns = parseLogRuns(rawLogText);
+         const res = await fetch('/api/runs');
+         logRuns = (await res.json()).runs || [];
          renderRuns();
       } catch (err) {
          console.error('Error loading logs:', err);
@@ -949,8 +888,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- REFRESH LOGS BUTTONS ---
     refreshLogsBtn.addEventListener('click', loadLogs);
-    rawLogsBtn.addEventListener('click', () => {
-       cronLogContent.textContent = rawLogText || 'Keine Logs vorhanden.';
+    rawLogsBtn.addEventListener('click', async () => {
+       try {
+          cronLogContent.textContent = (await (await fetch('/api/logs')).json()).logs || 'Keine Logs vorhanden.';
+       } catch (err) {
+          cronLogContent.textContent = 'Fehler beim Abrufen der Logs.';
+       }
        cronLogModal.classList.add('show');
     });
     runsTbody.addEventListener('click', (e) => {

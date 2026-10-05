@@ -21,8 +21,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const SERVICE_NAME = process.env.SERVICE_NAME ?? 'actual-fints-api';
-const { appendRun, compactStdout } = require('./utils/synclog');
-const LOG_FILE = path.join(__dirname, 'sync.log');
+const { LOG_FILE, runSync, parseRuns } = require('./utils/synclog');
 const ENV_FILE = path.join(__dirname, '.env');
 
 const runCommand = (command, args = [], options = {}) => {
@@ -1233,6 +1232,16 @@ app.delete('/api/banks/:name', (req, res) => {
    }
 });
 
+// GET /api/runs - Läufe aus dem sync.log, geparst (neueste zuerst)
+app.get('/api/runs', (req, res) => {
+   try {
+      const raw = fs.existsSync(LOG_FILE) ? fs.readFileSync(LOG_FILE, 'utf8') : '';
+      return res.json({ runs: parseRuns(raw) });
+   } catch (err) {
+      return res.status(500).json({ error: err.message });
+   }
+});
+
 // GET /api/logs - Get sync logs
 app.get('/api/logs', (req, res) => {
    try {
@@ -1534,45 +1543,29 @@ app.post('/api/transactions/load', async (req, res) => {
    }
 
    try {
-      const child = spawn('node', args, { stdio: 'pipe' });
-      let output = '';
-      let errorOutput = '';
+      const { code, output, errorOutput } = await runSync(args, `SYNC START (Range: ${start || 'Heute'} to ${end || 'Heute'})`);
 
-      child.stdout.on('data', (chunk) => (output += chunk));
-      child.stderr.on('data', (chunk) => (errorOutput += chunk));
-
-      child.on('close', (code) => {
-         release();
-
-         const timestamp = new Date().toLocaleString('de-DE');
-         const logContent = `\n[${timestamp}] --- SYNC START (Range: ${start || 'Heute'} to ${end || 'Heute'}) ---\nSTDOUT:\n${compactStdout(output.trim())}\nSTDERR:\n${errorOutput.trim()}\nEXIT: ${code ?? 'killed'}\n--- SYNC END ---\n`;
+      if (code === 0) {
+         let results = [];
          try {
-            appendRun(LOG_FILE, logContent);
-         } catch (e) {
-            console.error("Error writing sync.log:", e);
-         }
-
-         if (code === 0) {
-            let results = [];
-            try {
-               const lines = output.trim().split('\n');
-               for (let i = lines.length - 1; i >= 0; i--) {
-                  const line = lines[i].trim();
-                  if (line.startsWith('[') && line.endsWith(']')) {
-                     results = JSON.parse(line);
-                     break;
-                  }
+            const lines = output.trim().split('\n');
+            for (let i = lines.length - 1; i >= 0; i--) {
+               const line = lines[i].trim();
+               if (line.startsWith('[') && line.endsWith(']')) {
+                  results = JSON.parse(line);
+                  break;
                }
-            } catch (e) {
-               console.error("Failed to parse main.js stdout JSON results:", e);
             }
-            return res.json({ success: true, results, output: output.trim() });
+         } catch (e) {
+            console.error("Failed to parse main.js stdout JSON results:", e);
          }
-         return res.status(500).json({ success: false, error: errorOutput.trim() || 'main.js failed' });
-      });
+         return res.json({ success: true, results, output: output.trim() });
+      }
+      return res.status(500).json({ success: false, error: errorOutput.trim() || 'main.js failed' });
    } catch (err) {
-      release();
       return res.status(500).json({ success: false, error: err.message });
+   } finally {
+      release();
    }
 });
 
