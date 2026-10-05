@@ -34,26 +34,20 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Do NOT cache API requests
-  if (event.request.url.includes('/api/')) {
+  // API und Nicht-GET nie cachen
+  if (event.request.method !== 'GET' || event.request.url.includes('/api/')) {
     return;
   }
 
+  // Netz zuerst, damit Deploys sofort sichtbar sind; Cache nur als Offline-Fallback
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Return cached, but fetch fresh in bg to update cache (stale-while-revalidate)
-        fetch(event.request).then((networkResponse) => {
-          if (networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, networkResponse);
-            });
-          }
-        }).catch(() => {/* ignore background fetch errors */});
-        return cachedResponse;
+    fetch(event.request).then((networkResponse) => {
+      if (networkResponse.status === 200) {
+        const copy = networkResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
       }
-      return fetch(event.request);
-    })
+      return networkResponse;
+    }).catch(() => caches.match(event.request))
   );
 });
 

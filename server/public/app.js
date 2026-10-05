@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (type === 'success') icon = 'check_circle';
       if (type === 'error') icon = 'error';
       
-      toast.innerHTML = `<span class="material-icons">${icon}</span> <span>${message}</span>`;
+      toast.innerHTML = `<span class="material-icons">${icon}</span> <span>${escapeHtml(String(message))}</span>`;
       container.appendChild(toast);
 
       setTimeout(() => {
