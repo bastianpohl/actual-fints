@@ -21,6 +21,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const SERVICE_NAME = process.env.SERVICE_NAME ?? 'actual-fints-api';
+const { appendRun } = require('./utils/synclog');
 const LOG_FILE = path.join(__dirname, 'sync.log');
 const ENV_FILE = path.join(__dirname, '.env');
 
@@ -1546,14 +1547,7 @@ app.post('/api/transactions/load', async (req, res) => {
          const timestamp = new Date().toLocaleString('de-DE');
          const logContent = `\n[${timestamp}] --- SYNC START (Range: ${start || 'Heute'} to ${end || 'Heute'}) ---\nSTDOUT:\n${output.trim()}\nSTDERR:\n${errorOutput.trim()}\nEXIT: ${code ?? 'killed'}\n--- SYNC END ---\n`;
          try {
-            fs.appendFileSync(LOG_FILE, logContent, 'utf8');
-            // Keep log file under 50KB to prevent endless growth
-            const stats = fs.statSync(LOG_FILE);
-            if (stats.size > 50 * 1024) {
-               const data = fs.readFileSync(LOG_FILE, 'utf8');
-               const trimmed = data.substring(data.length - 30 * 1024); // Keep last 30KB
-               fs.writeFileSync(LOG_FILE, trimmed, 'utf8');
-            }
+            appendRun(LOG_FILE, logContent);
          } catch (e) {
             console.error("Error writing sync.log:", e);
          }
