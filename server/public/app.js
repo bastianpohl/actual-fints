@@ -457,6 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
    let runFilter = 'all';
 
    const ERROR_RE = /fehler|error|failed|unhandled|nicht gesetzt|keine banken/i;
+   const DUMP_RE = /^[\w$]+: |^[{}\[\]],?$/;
    const WARN_RE = /kein fints|keine fints|warnung|warning|fehl-match|übersprungen|deduplizierungs/i;
 
    // Zerlegt sync.log in einzelne Läufe (Cron und manuell)
@@ -500,6 +501,8 @@ document.addEventListener('DOMContentLoaded', () => {
       for (const l of [...r.stderr, ...r.stdout]) {
          const t = l.trim();
          if (!t || (t.startsWith('[') && t.endsWith(']') && t.length > 2 && t[1] === '{')) continue;
+         // Objekt-Dumps der Actual-Bibliothek (eingerückt bzw. "key: value,") sind keine Meldungen
+         if (/^\s/.test(l) || DUMP_RE.test(t)) continue;
          if (t.startsWith('[Reconciliation-Fehler]') || (ERROR_RE.test(t) && !WARN_RE.test(t))) errors.push(t);
          else if (WARN_RE.test(t)) warnings.push(t);
       }
