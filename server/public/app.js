@@ -520,7 +520,9 @@ document.addEventListener('DOMContentLoaded', () => {
       `<span class="run-chip ${kind}${count ? '' : ' zero'}" title="${label}"><span class="material-icons">${icon}</span>${count}</span>`;
 
    const chipsFor = (run) =>
-      chip('error', 'error_outline', run.errors.length, 'Fehler') +
+      !(run.errors.length || run.warnings.length || run.added || run.ignored)
+         ? '<span class="run-none">Keine Umsätze</span>'
+         : chip('error', 'error_outline', run.errors.length, 'Fehler') +
       chip('warning', 'warning_amber', run.warnings.length, 'Warnungen') +
       chip('success', 'download_done', run.added, 'Importiert') +
       chip('muted', 'block', run.ignored, 'Ignoriert');
@@ -535,9 +537,9 @@ document.addEventListener('DOMContentLoaded', () => {
       runsEmpty.style.display = visible.length ? 'none' : 'block';
       runsEmpty.textContent = logRuns.length ? 'Keine Läufe für diesen Filter.' : 'Noch keine Läufe vorhanden.';
       runsTbody.innerHTML = visible.map(({ r, i }) => `
-         <tr class="run-row${r.errors.length ? ' has-error' : ''}" data-idx="${i}" tabindex="0">
+         <tr class="run-row${r.errors.length ? ' has-error' : r.warnings.length ? ' has-warning' : r.added ? ' has-import' : ''}" data-idx="${i}" tabindex="0">
             <td class="run-time">${escapeHtml(r.timestamp)}</td>
-            <td><span class="run-kind">${r.cron ? 'Cron' : 'Manuell'}</span></td>
+            <td><span class="run-kind"><span class="material-icons">${r.cron ? 'schedule' : 'touch_app'}</span>${r.cron ? 'Cron' : 'Manuell'}</span></td>
             <td class="run-range">${escapeHtml(r.range || '–')}</td>
             <td><div class="run-chips">${chipsFor(r)}</div></td>
             <td class="run-chevron"><span class="material-icons">chevron_right</span></td>

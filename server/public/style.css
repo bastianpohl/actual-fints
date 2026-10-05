@@ -1411,3 +1411,48 @@ header {
    .run-tx-table tr:not(.ignored) td:first-child { box-shadow: inset 3px 0 0 var(--success); }
    .run-tx-table td { font-size: 0.78rem; }
 }
+
+/* ── Lauf-Übersicht mobil: Karten statt Tabelle ──────────────────── */
+.run-kind { display: inline-flex; align-items: center; gap: 0.25rem; }
+.run-kind .material-icons { font-size: 0.95rem; }
+.run-none { font-size: 0.8rem; color: var(--text-muted); }
+@media (max-width: 640px) {
+   .runs-card { background: none; border: 0; box-shadow: none; backdrop-filter: none; overflow: visible; }
+   .runs-card .runs-filter { border-bottom: 0; padding-left: 0; padding-right: 0; }
+   .runs-card .runs-table tbody { padding: 0; }
+   .runs-filter { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 0.75rem 1rem; }
+   .runs-filter::-webkit-scrollbar { display: none; }
+   .runs-filter-btn { flex: 0 0 auto; }
+   .runs-table, .runs-table tbody { display: block; }
+   .runs-table thead { display: none; }
+   /* td:nth-child(2/3) waren mobil ausgeblendet, hier wieder einblenden */
+   .runs-table td:nth-child(2), .runs-table td:nth-child(3) { display: block; }
+   .run-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      grid-template-areas: "time time chev" "kind range chev" "chips chips chev";
+      align-items: center;
+      column-gap: 0.6rem;
+      row-gap: 0.35rem;
+      padding: 0.8rem 0.9rem;
+      margin-bottom: 0.5rem;
+      border-radius: 12px;
+      background: var(--display-bg);
+      border: 1px solid var(--display-border);
+      border-left: 3px solid var(--display-border);
+   }
+   .run-row:last-child { margin-bottom: 0; }
+   .run-row:active { background: var(--nav-hover-bg); }
+   .run-row.has-error { border-left-color: var(--danger); background: rgba(239, 68, 68, 0.06); }
+   .run-row.has-warning { border-left-color: var(--warning); }
+   .run-row.has-import { border-left-color: var(--success); }
+   .run-row.has-error td:first-child { box-shadow: none; }
+   .run-row td { display: block; padding: 0; border: 0; }
+   .run-row .run-time { grid-area: time; font-size: 0.95rem; font-weight: 600; }
+   .run-row td:nth-child(2) { grid-area: kind; }
+   .run-row .run-range { grid-area: range; font-size: 0.78rem; white-space: normal; }
+   .run-row td:nth-child(4) { grid-area: chips; margin-top: 0.1rem; }
+   .run-row .run-chevron { grid-area: chev; width: auto; align-self: center; }
+   .run-row .run-chip.zero { display: none; }
+   .run-kind { font-size: 0.78rem; }
+}
