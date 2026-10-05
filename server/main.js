@@ -4,6 +4,8 @@ util.inspect.defaultOptions.depth = 5;
 const { FinTSClient } = require('./lib/fints-api');
 const { BudgetClient } = require('./lib/budget-api');
 const { CredentialsStore } = require('./lib/credentials-store');
+const api = require('@actual-app/api');
+const { findReconciledMatches, reconcileAccountIfSynchronized } = require('./utils/reconcile');
 const { maskIban } = require('./utils/mask');
 
 const parseDateRange = require('./utils/parseDateRange');
@@ -121,75 +123,29 @@ const main = async () => {
                added = importResult?.added?.length ?? 0;
                updated = importResult?.updated?.length ?? 0;
 
-               // Detect mismatch warnings for ignored transactions
-               if (importResult?.updatedPreview) {
-                  const api = require('@actual-app/api');
-                  const ignoredList = importResult.updatedPreview.filter(p => p.ignored);
-                  for (const ignored of ignoredList) {
-                     const trans = ignored.transaction;
-                     
-                     // Skip if this transaction was already imported in a previous sync run
-                     if (existingIds.has(trans.imported_id)) {
-                        continue;
-                     }
+               // Warnungen für neu ignorierte Buchungen, die mit einer abgeglichenen Buchung verwechselt wurden
+               const ignoredList = (importResult?.updatedPreview ?? []).filter(p => p.ignored);
+               for (const { trans, bestMatch, diffDays } of findReconciledMatches(actualConfig.dataDir, ignoredList, existingIds)) {
+                  let payeeName = 'Unbekannt';
+                  if (bestMatch.payee) {
+                     const payeeRow = await api.aqlQuery(api.q('payees').filter({ id: bestMatch.payee }).select('name'));
+                     payeeName = payeeRow?.data?.[0]?.name || bestMatch.payee;
+                  }
 
-                     // It's a new bank transaction that was ignored during import!
-                     // Find the matching reconciled transaction in the database.
-                     const { getDatabasePath } = require('./utils/reconcile');
-                     const Database = require('better-sqlite3');
-                     const dbPath = getDatabasePath(actualConfig.dataDir);
-                     let candidates = [];
-                     if (dbPath) {
-                        const db = new Database(dbPath);
-                        try {
-                           candidates = db.prepare(`
-                              SELECT id, date, description AS payee, notes FROM transactions
-                              WHERE acct = ? AND amount = ? AND reconciled = 1 AND financial_id IS NULL AND tombstone = 0 AND isChild = 0
-                           `).all(trans.account, trans.amount);
-                        } finally {
-                           db.close();
-                        }
-                     }
-                     if (candidates && candidates.length > 0) {
-                        const targetDate = new Date(trans.date);
-                        const matches = candidates.filter(c => {
-                           const cDate = new Date(c.date);
-                           const diffTime = Math.abs(targetDate - cDate);
-                           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                           return diffDays <= 7;
-                        });
-                        
-                        if (matches.length > 0) {
-                           // Sort closest date first
-                           matches.sort((a, b) => Math.abs(targetDate - new Date(a.date)) - Math.abs(targetDate - new Date(b.date)));
-                           const bestMatch = matches[0];
-                           
-                           const diffTime = Math.abs(targetDate - new Date(bestMatch.date));
-                           const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                           
-                           // Query payee name
-                           let payeeName = 'Unbekannt';
-                           if (bestMatch.payee) {
-                              const payeeRow = await api.aqlQuery(api.q('payees').filter({ id: bestMatch.payee }).select('name'));
-                              payeeName = payeeRow?.data?.[0]?.name || bestMatch.payee;
-                           }
-                           
-                           if (diffDays === 0) {
-                              console.warn(`[Deduplizierungs-Info] Buchung über ${(Math.abs(trans.amount)/100).toFixed(2)} € am ${trans.date} (${trans.imported_payee}) wurde ignoriert: Es existiert bereits eine abgeglichene Buchung am selben Tag.`);
-                           } else {
-                              console.warn(`[WARNUNG - Fehl-Match erkannt] Buchung über ${(Math.abs(trans.amount)/100).toFixed(2)} € vom ${trans.date} (${trans.imported_payee}) wurde ignoriert! Sie wurde fälschlicherweise mit einer Buchung von vor ${diffDays} Tag(en) (${bestMatch.date} - ${payeeName}) abgeglichen.`);
-                              warnings.push({
-                                 account: accountMapping.actualAccountName,
-                                 amount: trans.amount,
-                                 bankDate: trans.date,
-                                 bankPayee: trans.imported_payee || 'Unbekannt',
-                                 matchDate: bestMatch.date,
-                                 matchPayee: payeeName,
-                                 diffDays
-                              });
-                           }
-                        }
-                     }
+                  const amountEuro = (Math.abs(trans.amount) / 100).toFixed(2);
+                  if (diffDays === 0) {
+                     console.warn(`[Deduplizierungs-Info] Buchung über ${amountEuro} € am ${trans.date} (${trans.imported_payee}) wurde ignoriert: Es existiert bereits eine abgeglichene Buchung am selben Tag.`);
+                  } else {
+                     console.warn(`[WARNUNG - Fehl-Match erkannt] Buchung über ${amountEuro} € vom ${trans.date} (${trans.imported_payee}) wurde ignoriert! Sie wurde fälschlicherweise mit einer Buchung von vor ${diffDays} Tag(en) (${bestMatch.date} - ${payeeName}) abgeglichen.`);
+                     warnings.push({
+                        account: accountMapping.actualAccountName,
+                        amount: trans.amount,
+                        bankDate: trans.date,
+                        bankPayee: trans.imported_payee || 'Unbekannt',
+                        matchDate: bestMatch.date,
+                        matchPayee: payeeName,
+                        diffDays
+                     });
                   }
                }
 
@@ -239,7 +195,6 @@ const main = async () => {
                try {
                   const bal = await fintsClient.getBalance(matchedFintsAccount);
                   const activeAccountId = budgetClient.getActiveAccountId();
-                  const { reconcileAccountIfSynchronized } = require('./utils/reconcile');
                   
                   await reconcileAccountIfSynchronized(activeAccountId, accountMapping.actualAccountName, bal.bookedBalance);
                } catch (reconcileErr) {

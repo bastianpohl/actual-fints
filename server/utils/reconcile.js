@@ -129,4 +129,43 @@ async function reconcileAccountIfSynchronized(accountId, actualAccountName, bank
    }
 }
 
-module.exports = { reconcileAccountIfSynchronized, getAccountBalanceFromDb, getDatabasePath };
+
+const DAY_MS = 1000 * 60 * 60 * 24;
+
+/**
+ * Sucht zu neu ignorierten Bankbuchungen die bereits abgeglichene Buchung, mit der sie
+ * verwechselt wurden (gleiches Konto und Betrag, höchstens 7 Tage Abstand, ohne financial_id).
+ * Öffnet die Datenbank einmal für alle Buchungen.
+ *
+ * @param {string} dataDir Datenverzeichnis von Actual Budget.
+ * @param {Array<{transaction: object}>} ignoredList Vom Import ignorierte Buchungen (updatedPreview).
+ * @param {Set<string>} existingIds imported_ids, die schon vor diesem Lauf existierten.
+ * @returns {Array<{trans: object, bestMatch: object, diffDays: number}>} diffDays ist der Abstand in vollen Tagen.
+ */
+function findReconciledMatches(dataDir, ignoredList, existingIds) {
+   const fresh = ignoredList.filter(i => !existingIds.has(i.transaction.imported_id));
+   const dbPath = fresh.length ? getDatabasePath(dataDir) : null;
+   if (!dbPath) return [];
+
+   const db = new Database(dbPath);
+   try {
+      const stmt = db.prepare(`
+         SELECT id, date, description AS payee, notes FROM transactions
+         WHERE acct = ? AND amount = ? AND reconciled = 1 AND financial_id IS NULL AND tombstone = 0 AND isChild = 0
+      `);
+      const found = [];
+      for (const { transaction: trans } of fresh) {
+         const target = new Date(trans.date);
+         const distance = c => Math.abs(target - new Date(c.date));
+         const [bestMatch] = stmt.all(trans.account, trans.amount)
+            .filter(c => Math.ceil(distance(c) / DAY_MS) <= 7)
+            .sort((a, b) => distance(a) - distance(b));
+         if (bestMatch) found.push({ trans, bestMatch, diffDays: Math.floor(distance(bestMatch) / DAY_MS) });
+      }
+      return found;
+   } finally {
+      db.close();
+   }
+}
+
+module.exports = { reconcileAccountIfSynchronized, getAccountBalanceFromDb, getDatabasePath, findReconciledMatches };
