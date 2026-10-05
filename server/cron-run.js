@@ -1,6 +1,6 @@
 const { spawn } = require('node:child_process');
 const path = require('node:path');
-const { appendRun } = require('./utils/synclog');
+const { appendRun, compactStdout } = require('./utils/synclog');
 
 const LOG_FILE = path.join(__dirname, 'sync.log');
 const args = process.argv.slice(2);
@@ -24,7 +24,7 @@ child.stderr.on('data', (chunk) => {
 
 child.on('close', (code) => {
    const timestamp = new Date().toLocaleString('de-DE');
-   const logContent = `\n[${timestamp}] --- CRON SYNC START ---\nSTDOUT:\n${output.trim()}\nSTDERR:\n${errorOutput.trim()}\nEXIT: ${code ?? 'killed'}\n--- SYNC END ---\n`;
+   const logContent = `\n[${timestamp}] --- CRON SYNC START ---\nSTDOUT:\n${compactStdout(output.trim())}\nSTDERR:\n${errorOutput.trim()}\nEXIT: ${code ?? 'killed'}\n--- SYNC END ---\n`;
    
    try {
       appendRun(LOG_FILE, logContent);

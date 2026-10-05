@@ -540,7 +540,7 @@ document.addEventListener('DOMContentLoaded', () => {
          <tr class="run-row${r.errors.length ? ' has-error' : r.warnings.length ? ' has-warning' : r.added ? ' has-import' : ''}" data-idx="${i}" tabindex="0">
             <td class="run-time">${escapeHtml(r.timestamp)}</td>
             <td><span class="run-kind"><span class="material-icons">${r.cron ? 'schedule' : 'touch_app'}</span>${r.cron ? 'Cron' : 'Manuell'}</span></td>
-            <td class="run-range">${escapeHtml(r.range || '–')}</td>
+            <td class="run-range">${escapeHtml(r.range || 'Standard')}</td>
             <td><div class="run-chips">${chipsFor(r)}</div></td>
             <td class="run-chevron"><span class="material-icons">chevron_right</span></td>
          </tr>`).join('');

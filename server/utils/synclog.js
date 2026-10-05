@@ -12,6 +12,22 @@ const trimToRunBoundary = (data) => {
    return m ? tail.substring(m.index) : tail;
 };
 
+// Die Actual-Bibliothek schreibt ganze Objekt-Dumps nach STDOUT (tausende eingerückte Zeilen pro Lauf).
+// Sie enthalten nichts, was die Auswertung braucht, also entfernen und die Anzahl vermerken.
+const compactStdout = (text) => {
+   let dropped = 0;
+   const kept = [];
+   for (const line of text.split('\n')) {
+      if (/^\s/.test(line) || /^[}\]],?$/.test(line)) {
+         dropped++;
+      } else {
+         kept.push(line);
+      }
+   }
+   if (dropped) kept.push(`[${dropped} Zeilen Debug-Ausgabe entfernt]`);
+   return kept.join('\n');
+};
+
 const appendRun = (logFile, content) => {
    fs.appendFileSync(logFile, content, 'utf8');
    if (fs.statSync(logFile).size > MAX_BYTES) {
@@ -19,4 +35,4 @@ const appendRun = (logFile, content) => {
    }
 };
 
-module.exports = { appendRun, trimToRunBoundary };
+module.exports = { appendRun, compactStdout, trimToRunBoundary };

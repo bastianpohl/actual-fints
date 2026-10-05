@@ -21,7 +21,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const SERVICE_NAME = process.env.SERVICE_NAME ?? 'actual-fints-api';
-const { appendRun } = require('./utils/synclog');
+const { appendRun, compactStdout } = require('./utils/synclog');
 const LOG_FILE = path.join(__dirname, 'sync.log');
 const ENV_FILE = path.join(__dirname, '.env');
 
@@ -1545,7 +1545,7 @@ app.post('/api/transactions/load', async (req, res) => {
          release();
 
          const timestamp = new Date().toLocaleString('de-DE');
-         const logContent = `\n[${timestamp}] --- SYNC START (Range: ${start || 'Heute'} to ${end || 'Heute'}) ---\nSTDOUT:\n${output.trim()}\nSTDERR:\n${errorOutput.trim()}\nEXIT: ${code ?? 'killed'}\n--- SYNC END ---\n`;
+         const logContent = `\n[${timestamp}] --- SYNC START (Range: ${start || 'Heute'} to ${end || 'Heute'}) ---\nSTDOUT:\n${compactStdout(output.trim())}\nSTDERR:\n${errorOutput.trim()}\nEXIT: ${code ?? 'killed'}\n--- SYNC END ---\n`;
          try {
             appendRun(LOG_FILE, logContent);
          } catch (e) {
