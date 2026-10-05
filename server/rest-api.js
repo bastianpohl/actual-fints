@@ -1544,7 +1544,7 @@ app.post('/api/transactions/load', async (req, res) => {
          release();
 
          const timestamp = new Date().toLocaleString('de-DE');
-         const logContent = `\n[${timestamp}] --- SYNC START (Range: ${start || 'Heute'} to ${end || 'Heute'}) ---\nSTDOUT:\n${output.trim()}\nSTDERR:\n${errorOutput.trim()}\n--- SYNC END ---\n`;
+         const logContent = `\n[${timestamp}] --- SYNC START (Range: ${start || 'Heute'} to ${end || 'Heute'}) ---\nSTDOUT:\n${output.trim()}\nSTDERR:\n${errorOutput.trim()}\nEXIT: ${code ?? 'killed'}\n--- SYNC END ---\n`;
          try {
             fs.appendFileSync(LOG_FILE, logContent, 'utf8');
             // Keep log file under 50KB to prevent endless growth

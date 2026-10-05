@@ -24,7 +24,7 @@ child.stderr.on('data', (chunk) => {
 
 child.on('close', (code) => {
    const timestamp = new Date().toLocaleString('de-DE');
-   const logContent = `\n[${timestamp}] --- CRON SYNC START ---\nSTDOUT:\n${output.trim()}\nSTDERR:\n${errorOutput.trim()}\n--- SYNC END ---\n`;
+   const logContent = `\n[${timestamp}] --- CRON SYNC START ---\nSTDOUT:\n${output.trim()}\nSTDERR:\n${errorOutput.trim()}\nEXIT: ${code ?? 'killed'}\n--- SYNC END ---\n`;
    
    try {
       fs.appendFileSync(LOG_FILE, logContent, 'utf8');

@@ -206,22 +206,27 @@
          <div class="bank-list-header">
             <h2>Ausführungsprotokolle</h2>
             <div style="display:flex; gap:0.75rem;">
-               <button class="btn secondary" id="clear-logs-ui-btn">Logs leeren</button>
+               <button class="btn secondary" id="raw-logs-btn">Rohdaten</button>
                <button class="btn" id="refresh-logs-btn">Aktualisieren</button>
             </div>
          </div>
 
-         <div class="terminal-window">
-            <div class="terminal-header">
-               <div class="terminal-bullets">
-                  <div class="bullet red"></div>
-                  <div class="bullet yellow"></div>
-                  <div class="bullet green"></div>
-               </div>
-               <div class="terminal-title">sync.log – Live Viewer</div>
-               <div></div>
+         <div class="glass-card runs-card">
+            <div class="runs-filter" id="runs-filter">
+               <button class="runs-filter-btn active" data-filter="all">Alle</button>
+               <button class="runs-filter-btn" data-filter="error">Fehler</button>
+               <button class="runs-filter-btn" data-filter="warning">Warnungen</button>
+               <button class="runs-filter-btn" data-filter="imported">Mit Importen</button>
             </div>
-            <div class="terminal-content" id="terminal-log-content">Noch keine Logs geladen.</div>
+            <div class="runs-table-wrap">
+               <table class="runs-table">
+                  <thead>
+                     <tr><th>Zeitpunkt</th><th>Art</th><th>Zeitraum</th><th>Ergebnis</th><th></th></tr>
+                  </thead>
+                  <tbody id="runs-tbody"></tbody>
+               </table>
+            </div>
+            <div class="runs-empty" id="runs-empty" style="display:none;">Noch keine Läufe vorhanden.</div>
          </div>
       </main>
 
@@ -533,6 +538,17 @@
                   </div>
                </div>
             </form>
+         </div>
+      </div>
+
+      <!-- Modal: Run Detail -->
+      <div class="modal-backdrop" id="run-detail-modal">
+         <div class="glass-card modal-card run-detail-card">
+            <div class="modal-header">
+               <h2 id="run-detail-title" style="margin:0;">Lauf</h2>
+               <button class="close-btn" id="run-detail-close-btn"><span class="material-icons">close</span></button>
+            </div>
+            <div id="run-detail-body"></div>
          </div>
       </div>
 

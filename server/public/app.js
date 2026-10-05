@@ -44,9 +44,14 @@ document.addEventListener('DOMContentLoaded', () => {
    const addBankBtn = document.getElementById('add-bank-btn');
 
    // Logs Page
-   const terminalLogContent = document.getElementById('terminal-log-content');
+   const runsTbody = document.getElementById('runs-tbody');
+   const runsEmpty = document.getElementById('runs-empty');
+   const runsFilter = document.getElementById('runs-filter');
    const refreshLogsBtn = document.getElementById('refresh-logs-btn');
-   const clearLogsUiBtn = document.getElementById('clear-logs-ui-btn');
+   const rawLogsBtn = document.getElementById('raw-logs-btn');
+   const runDetailModal = document.getElementById('run-detail-modal');
+   const runDetailTitle = document.getElementById('run-detail-title');
+   const runDetailBody = document.getElementById('run-detail-body');
 
    // Theme Settings selectors
    const settingsSystemTheme = document.getElementById('settings-system-theme');
@@ -446,17 +451,136 @@ document.addEventListener('DOMContentLoaded', () => {
       }
    };
 
-   // 4. Fetch Logs
+   // 4. Fetch & render Logs (tabellarische Lauf-Übersicht)
+   let logRuns = [];
+   let rawLogText = '';
+   let runFilter = 'all';
+
+   const ERROR_RE = /fehler|error|failed|unhandled|nicht gesetzt|keine banken/i;
+   const WARN_RE = /kein fints|keine fints|warnung|warning|fehl-match|übersprungen|deduplizierungs/i;
+
+   // Zerlegt sync.log in einzelne Läufe (Cron und manuell)
+   const parseLogRuns = (raw) => {
+      const runs = [];
+      const headerRe = /^\[(.*?)\] --- (CRON SYNC START|SYNC START)(?: \(Range: (.*?) to (.*?)\))? ---\s*$/;
+      let cur = null;
+      let section = 'stdout';
+      const finish = () => { if (cur) runs.push(finishRun(cur)); cur = null; };
+      for (const line of raw.split('\n')) {
+         const m = line.match(headerRe);
+         if (m) {
+            finish();
+            cur = { timestamp: m[1], cron: m[2] === 'CRON SYNC START', range: m[3] ? `${m[3]} – ${m[4]}` : '', stdout: [], stderr: [] };
+            section = 'stdout';
+         } else if (cur) {
+            const t = line.trim();
+            if (t === 'STDOUT:') section = 'stdout';
+            else if (t === 'STDERR:') section = 'stderr';
+            else if (t === '--- SYNC END ---') finish();
+            else if (section === 'stderr' && /^EXIT: /.test(t)) cur.exit = t.slice(6);
+            else cur[section].push(line);
+         }
+      }
+      finish();
+      return runs.reverse();
+   };
+
+   const finishRun = (r) => {
+      const stdout = r.stdout.join('\n').trim();
+      const stderr = r.stderr.join('\n').trim();
+      let results = [];
+      for (const l of r.stdout) {
+         const t = l.trim();
+         if (t.startsWith('[') && t.endsWith(']')) {
+            try { const parsed = JSON.parse(t); if (Array.isArray(parsed)) results = parsed; } catch (e) { /* kein JSON */ }
+         }
+      }
+      const errors = [];
+      const warnings = [];
+      for (const l of [...r.stderr, ...r.stdout]) {
+         const t = l.trim();
+         if (!t || (t.startsWith('[') && t.endsWith(']') && t.length > 2 && t[1] === '{')) continue;
+         if (t.startsWith('[Reconciliation-Fehler]') || (ERROR_RE.test(t) && !WARN_RE.test(t))) errors.push(t);
+         else if (WARN_RE.test(t)) warnings.push(t);
+      }
+      if (r.exit !== undefined && r.exit !== '0') {
+         errors.unshift(`Prozess mit Exit-Code ${r.exit} beendet`);
+      }
+      const added = results.reduce((n, a) => n + (a.added || 0), 0);
+      const ignored = results.reduce((n, a) => n + (a.ignored || 0), 0);
+      return { ...r, stdout, stderr, results, errors, warnings, added, ignored };
+   };
+
+   const fmtEuro = (cents) => (cents / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+
+   const chip = (kind, icon, count, label) =>
+      `<span class="run-chip ${kind}${count ? '' : ' zero'}" title="${label}"><span class="material-icons">${icon}</span>${count}</span>`;
+
+   const chipsFor = (run) =>
+      chip('error', 'error_outline', run.errors.length, 'Fehler') +
+      chip('warning', 'warning_amber', run.warnings.length, 'Warnungen') +
+      chip('success', 'download_done', run.added, 'Importiert') +
+      chip('muted', 'block', run.ignored, 'Ignoriert');
+
+   const renderRuns = () => {
+      const visible = logRuns.map((r, i) => ({ r, i })).filter(({ r }) => {
+         if (runFilter === 'error') return r.errors.length > 0;
+         if (runFilter === 'warning') return r.warnings.length > 0;
+         if (runFilter === 'imported') return r.added > 0;
+         return true;
+      });
+      runsEmpty.style.display = visible.length ? 'none' : 'block';
+      runsEmpty.textContent = logRuns.length ? 'Keine Läufe für diesen Filter.' : 'Noch keine Läufe vorhanden.';
+      runsTbody.innerHTML = visible.map(({ r, i }) => `
+         <tr class="run-row${r.errors.length ? ' has-error' : ''}" data-idx="${i}" tabindex="0">
+            <td class="run-time">${escapeHtml(r.timestamp)}</td>
+            <td><span class="run-kind">${r.cron ? 'Cron' : 'Manuell'}</span></td>
+            <td class="run-range">${escapeHtml(r.range || '–')}</td>
+            <td><div class="run-chips">${chipsFor(r)}</div></td>
+            <td class="run-chevron"><span class="material-icons">chevron_right</span></td>
+         </tr>`).join('');
+   };
+
+   const openRunDetail = (idx) => {
+      const r = logRuns[idx];
+      if (!r) return;
+      runDetailTitle.textContent = `${r.cron ? 'Cron-Lauf' : 'Manueller Lauf'} · ${r.timestamp}`;
+      const list = (items) => items.map(l => `<li>${escapeHtml(l)}</li>`).join('');
+      let html = `<div class="run-chips run-detail-chips">${chipsFor(r)}</div>`;
+      if (r.range) html += `<p class="run-detail-meta">Zeitraum: ${escapeHtml(r.range)}</p>`;
+      if (r.errors.length) html += `<h3 class="run-section error">Fehler</h3><ul class="run-lines error">${list(r.errors)}</ul>`;
+      if (r.warnings.length) html += `<h3 class="run-section warning">Warnungen</h3><ul class="run-lines warning">${list(r.warnings)}</ul>`;
+      for (const a of r.results) {
+         html += `<h3 class="run-section">${escapeHtml(a.account)} <span class="run-account-stats">${a.added || 0} importiert · ${a.ignored || 0} ignoriert</span></h3>`;
+         if (a.transactions && a.transactions.length) {
+            html += '<table class="run-tx-table"><tbody>' + a.transactions.map(t => `
+               <tr class="${t.status === 'added' ? '' : 'ignored'}">
+                  <td>${escapeHtml(t.date)}</td><td>${escapeHtml(t.payee)}</td>
+                  <td class="amt ${t.amount < 0 ? 'debit' : 'credit'}">${fmtEuro(t.amount)}</td>
+                  <td>${t.status === 'added' ? 'importiert' : 'ignoriert'}</td>
+               </tr>`).join('') + '</tbody></table>';
+         }
+      }
+      if (!r.results.length && !r.errors.length && !r.warnings.length) html += '<p class="run-detail-meta">Keine Umsätze in diesem Lauf.</p>';
+      html += `<details class="run-raw"><summary>Rohausgabe</summary><pre>${escapeHtml(
+         (r.stdout ? 'STDOUT:\n' + r.stdout + '\n\n' : '') + (r.stderr ? 'STDERR:\n' + r.stderr : '')
+      )}</pre></details>`;
+      runDetailBody.innerHTML = html;
+      runDetailModal.classList.add('show');
+   };
+
    const loadLogs = async () => {
       try {
          const res = await fetch('/api/logs');
          const data = await res.json();
-         terminalLogContent.textContent = data.logs || 'Noch keine Protokolle vorhanden.';
-         // Scroll to bottom of terminal content
-         terminalLogContent.scrollTop = terminalLogContent.scrollHeight;
+         rawLogText = data.logs || '';
+         logRuns = parseLogRuns(rawLogText);
+         renderRuns();
       } catch (err) {
          console.error('Error loading logs:', err);
-         terminalLogContent.textContent = 'Fehler beim Abrufen der Logs.';
+         runsTbody.innerHTML = '';
+         runsEmpty.style.display = 'block';
+         runsEmpty.textContent = 'Fehler beim Abrufen der Logs.';
       }
    };
 
@@ -820,9 +944,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- REFRESH LOGS BUTTONS ---
     refreshLogsBtn.addEventListener('click', loadLogs);
-    clearLogsUiBtn.addEventListener('click', () => {
-       terminalLogContent.textContent = 'Ansicht geleert.';
+    rawLogsBtn.addEventListener('click', () => {
+       cronLogContent.textContent = rawLogText || 'Keine Logs vorhanden.';
+       cronLogModal.classList.add('show');
     });
+    runsTbody.addEventListener('click', (e) => {
+       const row = e.target.closest('.run-row');
+       if (row) openRunDetail(Number(row.dataset.idx));
+    });
+    runsTbody.addEventListener('keydown', (e) => {
+       const row = e.target.closest('.run-row');
+       if (row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openRunDetail(Number(row.dataset.idx)); }
+    });
+    runsFilter.addEventListener('click', (e) => {
+       const btn = e.target.closest('.runs-filter-btn');
+       if (!btn) return;
+       runFilter = btn.dataset.filter;
+       runsFilter.querySelectorAll('.runs-filter-btn').forEach(b => b.classList.toggle('active', b === btn));
+       renderRuns();
+    });
+    document.getElementById('run-detail-close-btn').addEventListener('click', () => runDetailModal.classList.remove('show'));
+    runDetailModal.addEventListener('click', (e) => { if (e.target === runDetailModal) runDetailModal.classList.remove('show'); });
 
 
      // --- PWA WEB-PUSH HANDLERS ---

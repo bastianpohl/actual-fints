@@ -1354,3 +1354,53 @@ header {
       order: 3 !important;
    }
 }
+
+/* ── Lauf-Übersicht (Logs-Tab) ───────────────────────────────────── */
+.runs-card { padding: 0; overflow: hidden; }
+.runs-filter { display: flex; gap: 0.5rem; padding: 0.85rem 1rem; border-bottom: 1px solid var(--header-border); flex-wrap: wrap; }
+.runs-filter-btn { background: var(--btn-sec-bg); border: 1px solid var(--btn-sec-border); color: var(--text-secondary); border-radius: 999px; padding: 0.25rem 0.8rem; font: inherit; font-size: 0.8rem; cursor: pointer; }
+.runs-filter-btn.active { background: var(--accent-primary); border-color: var(--accent-primary); color: #fff; }
+.runs-table-wrap { overflow-x: auto; }
+.runs-table { width: 100%; border-collapse: collapse; }
+.runs-table th { text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 500; padding: 0.6rem 1rem; }
+.runs-table td { padding: 0.7rem 1rem; border-top: 1px solid var(--bank-card-separator); font-size: 0.88rem; vertical-align: middle; }
+.run-row { cursor: pointer; transition: background var(--transition-fast); }
+.run-row:hover, .run-row:focus-visible { background: var(--nav-hover-bg); outline: none; }
+.run-row.has-error td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
+.run-time { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.run-range { color: var(--text-secondary); white-space: nowrap; }
+.run-kind { font-size: 0.75rem; color: var(--text-secondary); }
+.run-chevron { width: 1%; color: var(--text-muted); }
+.run-chips { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.run-chip { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.15rem 0.55rem 0.15rem 0.35rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; border: 1px solid transparent; }
+.run-chip .material-icons { font-size: 1rem; }
+.run-chip.error { color: var(--danger); background: rgba(239, 68, 68, 0.14); border-color: rgba(239, 68, 68, 0.3); }
+.run-chip.warning { color: var(--warning); background: rgba(245, 158, 11, 0.14); border-color: rgba(245, 158, 11, 0.3); }
+.run-chip.success { color: var(--success); background: rgba(16, 185, 129, 0.14); border-color: rgba(16, 185, 129, 0.3); }
+.run-chip.muted { color: var(--text-secondary); background: var(--display-bg); border-color: var(--display-border); }
+.run-chip.zero { opacity: 0.35; background: transparent; border-color: var(--display-border); color: var(--text-muted); }
+.runs-empty { padding: 2rem 1rem; text-align: center; color: var(--text-muted); }
+.run-detail-card { max-width: 760px; width: 94%; }
+.run-detail-meta { color: var(--text-secondary); font-size: 0.85rem; margin: 0.75rem 0 0; }
+.run-detail-chips { margin-bottom: 0.25rem; }
+.run-section { font-size: 0.95rem; margin: 1.1rem 0 0.4rem; display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+.run-section.error { color: var(--danger); }
+.run-section.warning { color: var(--warning); }
+.run-account-stats { font-size: 0.75rem; font-weight: 400; color: var(--text-muted); }
+.run-lines { list-style: none; margin: 0; padding: 0; font-family: var(--font-mono); font-size: 0.78rem; line-height: 1.45; }
+.run-lines li { padding: 0.4rem 0.6rem; border-radius: 6px; margin-bottom: 0.3rem; word-break: break-word; }
+.run-lines.error li { background: rgba(239, 68, 68, 0.1); border-left: 3px solid var(--danger); }
+.run-lines.warning li { background: rgba(245, 158, 11, 0.1); border-left: 3px solid var(--warning); }
+.run-tx-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.run-tx-table td { padding: 0.3rem 0.4rem; border-top: 1px solid var(--bank-card-separator); }
+.run-tx-table tr.ignored { color: var(--text-muted); }
+.run-tx-table .amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.run-tx-table .amt.credit { color: var(--success); }
+.run-tx-table .amt.debit { color: var(--danger); }
+.run-raw { margin-top: 1.1rem; }
+.run-raw summary { cursor: pointer; color: var(--text-secondary); font-size: 0.85rem; }
+.run-raw pre { background: #040206; color: #A7F3D0; padding: 0.85rem; border-radius: 8px; font-family: var(--font-mono); font-size: 0.75rem; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow: auto; }
+@media (max-width: 640px) {
+   .runs-table th:nth-child(2), .runs-table td:nth-child(2), .runs-table th:nth-child(3), .runs-table td:nth-child(3) { display: none; }
+   .runs-table td, .runs-table th { padding-left: 0.7rem; padding-right: 0.7rem; }
+}
