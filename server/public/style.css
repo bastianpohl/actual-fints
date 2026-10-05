@@ -1404,3 +1404,10 @@ header {
    .runs-table th:nth-child(2), .runs-table td:nth-child(2), .runs-table th:nth-child(3), .runs-table td:nth-child(3) { display: none; }
    .runs-table td, .runs-table th { padding-left: 0.7rem; padding-right: 0.7rem; }
 }
+.run-tx-table td:first-child { white-space: nowrap; }
+@media (max-width: 640px) {
+   /* Status-Spalte entfällt mobil: ignorierte Zeilen sind abgedunkelt, importierte tragen einen grünen Rand */
+   .run-tx-table td:last-child { display: none; }
+   .run-tx-table tr:not(.ignored) td:first-child { box-shadow: inset 3px 0 0 var(--success); }
+   .run-tx-table td { font-size: 0.78rem; }
+}
