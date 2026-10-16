@@ -1460,3 +1460,9 @@ header {
 button.run-chip { font-family: inherit; cursor: pointer; }
 .run-chip.active { box-shadow: 0 0 0 2px currentColor; }
 .run-detail-chips select { font: inherit; font-size: 0.82rem; padding: 0.25rem 0.5rem; border-radius: 8px; border: 1px solid var(--display-border); background: var(--display-bg); color: var(--text-secondary); }
+@media (max-width: 640px) {
+   /* Sheet wird sonst von der Tab-Bar verdeckt; Filterleiste bleibt beim Scrollen sichtbar */
+   #run-detail-modal .modal-card { padding-bottom: calc(85px + env(safe-area-inset-bottom)); }
+   .run-detail-chips { position: sticky; top: -1.25rem; z-index: 1; margin: 0 -1.25rem; padding: 0.6rem 1.25rem; background: var(--bg-secondary); }
+   .run-detail-chips select { margin-left: auto; }
+}
