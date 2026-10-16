@@ -1377,7 +1377,7 @@ header {
 .run-chip.error { color: var(--danger); background: rgba(239, 68, 68, 0.14); border-color: rgba(239, 68, 68, 0.3); }
 .run-chip.warning { color: var(--warning); background: rgba(245, 158, 11, 0.14); border-color: rgba(245, 158, 11, 0.3); }
 .run-chip.success { color: var(--success); background: rgba(16, 185, 129, 0.14); border-color: rgba(16, 185, 129, 0.3); }
-.run-chip.muted { color: var(--text-secondary); background: var(--display-bg); border-color: var(--display-border); }
+.run-chip.muted { color: #60a5fa; background: rgba(59, 130, 246, 0.14); border-color: rgba(59, 130, 246, 0.3); }
 .run-chip.zero { opacity: 0.35; background: transparent; border-color: var(--display-border); color: var(--text-muted); }
 .runs-empty { padding: 2rem 1rem; text-align: center; color: var(--text-muted); }
 .run-detail-card { max-width: 760px; width: 94%; }
@@ -1458,7 +1458,14 @@ header {
 }
 .run-detail-chips { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
 button.run-chip { font-family: inherit; cursor: pointer; }
-.run-chip.active { box-shadow: 0 0 0 2px currentColor; }
+button.run-chip:not(:disabled):hover { filter: brightness(1.15); }
+button.run-chip:disabled { cursor: default; }
+/* aktiver Filter: gefüllt statt nur getönt */
+.run-chip.active { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25); }
+.run-chip.error.active { background: var(--danger); border-color: var(--danger); color: #fff; }
+.run-chip.warning.active { background: var(--warning); border-color: var(--warning); color: #1c1200; }
+.run-chip.success.active { background: var(--success); border-color: var(--success); color: #fff; }
+.run-chip.muted.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
 .run-detail-chips select { font: inherit; font-size: 0.82rem; padding: 0.25rem 0.5rem; border-radius: 8px; border: 1px solid var(--display-border); background: var(--display-bg); color: var(--text-secondary); }
 @media (max-width: 640px) {
    /* Sheet wird sonst von der Tab-Bar verdeckt; Filterleiste bleibt beim Scrollen sichtbar */

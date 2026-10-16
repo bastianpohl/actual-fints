@@ -463,7 +463,7 @@ document.addEventListener('DOMContentLoaded', () => {
    const chip = (kind, icon, count, label, filter) => {
       const cls = `run-chip ${kind}${count ? '' : ' zero'}`, ic = `<span class="material-icons">${icon}</span>${count}`;
       return filter
-         ? `<button type="button" class="${cls}${detailFilter.status === filter ? ' active' : ''}" data-status="${filter}" title="${label}">${ic}</button>`
+         ? `<button type="button" class="${cls}${detailFilter.status === filter ? ' active' : ''}" data-status="${filter}"${count ? '' : ' disabled'} title="${label}">${ic}</button>`
          : `<span class="${cls}" title="${label}">${ic}</span>`;
    };
 
