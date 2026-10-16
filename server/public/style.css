@@ -1456,3 +1456,7 @@ header {
    .run-row .run-chip.zero { display: none; }
    .run-kind { font-size: 0.78rem; }
 }
+.run-detail-chips { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+button.run-chip { font-family: inherit; cursor: pointer; }
+.run-chip.active { box-shadow: 0 0 0 2px currentColor; }
+.run-detail-chips select { font: inherit; font-size: 0.82rem; padding: 0.25rem 0.5rem; border-radius: 8px; border: 1px solid var(--display-border); background: var(--display-bg); color: var(--text-secondary); }

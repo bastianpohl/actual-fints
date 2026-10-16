@@ -453,20 +453,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
    // 4. Fetch & render Logs (tabellarische Lauf-Übersicht)
    let logRuns = [];
+   let detailIdx = -1;
+   const detailFilter = { status: 'all', dir: 'all' };
    let runFilter = 'all';
 
    const fmtEuro = (cents) => (cents / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
 
-   const chip = (kind, icon, count, label) =>
-      `<span class="run-chip ${kind}${count ? '' : ' zero'}" title="${label}"><span class="material-icons">${icon}</span>${count}</span>`;
+   // filter (nur im Detail-Dialog): Chip wird zum Toggle-Button für den Status-Filter
+   const chip = (kind, icon, count, label, filter) => {
+      const cls = `run-chip ${kind}${count ? '' : ' zero'}`, ic = `<span class="material-icons">${icon}</span>${count}`;
+      return filter
+         ? `<button type="button" class="${cls}${detailFilter.status === filter ? ' active' : ''}" data-status="${filter}" title="${label}">${ic}</button>`
+         : `<span class="${cls}" title="${label}">${ic}</span>`;
+   };
 
-   const chipsFor = (run) =>
+   const chipsFor = (run, interactive) =>
       !(run.errors.length || run.warnings.length || run.added || run.ignored)
          ? '<span class="run-none">Keine Umsätze</span>'
-         : chip('error', 'error_outline', run.errors.length, 'Fehler') +
-      chip('warning', 'warning_amber', run.warnings.length, 'Warnungen') +
-      chip('success', 'download_done', run.added, 'Importiert') +
-      chip('muted', 'block', run.ignored, 'Ignoriert');
+         : chip('error', 'error_outline', run.errors.length, 'Fehler', interactive && 'error') +
+      chip('warning', 'warning_amber', run.warnings.length, 'Warnungen', interactive && 'warning') +
+      chip('success', 'download_done', run.added, 'Importiert', interactive && 'added') +
+      chip('muted', 'block', run.ignored, 'Ignoriert', interactive && 'ignored');
 
    const renderRuns = () => {
       const visible = logRuns.map((r, i) => ({ r, i })).filter(({ r }) => {
@@ -487,19 +494,28 @@ document.addEventListener('DOMContentLoaded', () => {
          </tr>`).join('');
    };
 
+
    const openRunDetail = (idx) => {
       const r = logRuns[idx];
       if (!r) return;
+      if (idx !== detailIdx) { detailIdx = idx; detailFilter.status = detailFilter.dir = 'all'; }
+      const { status, dir } = detailFilter;
+      const showTx = status === 'all' || status === 'added' || status === 'ignored';
       runDetailTitle.textContent = `${r.cron ? 'Cron-Lauf' : 'Manueller Lauf'} · ${r.timestamp}`;
       const list = (items) => items.map(l => `<li>${escapeHtml(l)}</li>`).join('');
-      let html = `<div class="run-chips run-detail-chips">${chipsFor(r)}</div>`;
+      const dirSel = `<select data-filter="dir">${[['all', 'Alle'], ['credit', 'Einnahmen'], ['debit', 'Ausgaben']].map(([v, l]) => `<option value="${v}"${dir === v ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
+      let html = `<div class="run-detail-chips"><div class="run-chips">${chipsFor(r, true)}</div>${dirSel}</div>`;
       if (r.range) html += `<p class="run-detail-meta">Zeitraum: ${escapeHtml(r.range)}</p>`;
-      if (r.errors.length) html += `<h3 class="run-section error">Fehler</h3><ul class="run-lines error">${list(r.errors)}</ul>`;
-      if (r.warnings.length) html += `<h3 class="run-section warning">Warnungen</h3><ul class="run-lines warning">${list(r.warnings)}</ul>`;
-      for (const a of r.results) {
+      if ((status === 'all' || status === 'error') && r.errors.length) html += `<h3 class="run-section error">Fehler</h3><ul class="run-lines error">${list(r.errors)}</ul>`;
+      if ((status === 'all' || status === 'warning') && r.warnings.length) html += `<h3 class="run-section warning">Warnungen</h3><ul class="run-lines warning">${list(r.warnings)}</ul>`;
+      for (const a of showTx ? r.results : []) {
+         const txs = (a.transactions || []).filter(t =>
+            (status === 'all' || t.status === status) &&
+            (dir === 'all' || (dir === 'debit') === (t.amount < 0)));
+         if (!txs.length) continue;
          html += `<h3 class="run-section">${escapeHtml(a.account)} <span class="run-account-stats">${a.added || 0} importiert · ${a.ignored || 0} ignoriert</span></h3>`;
-         if (a.transactions && a.transactions.length) {
-            html += '<table class="run-tx-table"><tbody>' + a.transactions.map(t => `
+         {
+            html += '<table class="run-tx-table"><tbody>' + txs.map(t => `
                <tr class="${t.status === 'added' ? '' : 'ignored'}">
                   <td>${escapeHtml(t.date)}</td><td>${escapeHtml(t.payee)}</td>
                   <td class="amt ${t.amount < 0 ? 'debit' : 'credit'}">${fmtEuro(t.amount)}</td>
@@ -507,7 +523,7 @@ document.addEventListener('DOMContentLoaded', () => {
                </tr>`).join('') + '</tbody></table>';
          }
       }
-      if (!r.results.length && !r.errors.length && !r.warnings.length) html += '<p class="run-detail-meta">Keine Umsätze in diesem Lauf.</p>';
+      if (!html.includes('run-section')) html += '<p class="run-detail-meta">Keine Einträge für diesen Filter.</p>';
       html += `<details class="run-raw"><summary>Rohausgabe</summary><pre>${escapeHtml(
          (r.stdout ? 'STDOUT:\n' + r.stdout + '\n\n' : '') + (r.stderr ? 'STDERR:\n' + r.stderr : '')
       )}</pre></details>`;
@@ -910,6 +926,13 @@ document.addEventListener('DOMContentLoaded', () => {
        runFilter = btn.dataset.filter;
        runsFilter.querySelectorAll('.runs-filter-btn').forEach(b => b.classList.toggle('active', b === btn));
        renderRuns();
+    });
+    runDetailBody.addEventListener('change', (e) => {
+       if (e.target.dataset.filter) { detailFilter.dir = e.target.value; openRunDetail(detailIdx); }
+    });
+    runDetailBody.addEventListener('click', (e) => {
+       const c = e.target.closest('[data-status]');
+       if (c) { detailFilter.status = detailFilter.status === c.dataset.status ? 'all' : c.dataset.status; openRunDetail(detailIdx); }
     });
     document.getElementById('run-detail-close-btn').addEventListener('click', () => runDetailModal.classList.remove('show'));
     runDetailModal.addEventListener('click', (e) => { if (e.target === runDetailModal) runDetailModal.classList.remove('show'); });
