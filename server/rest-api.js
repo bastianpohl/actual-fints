@@ -196,38 +196,92 @@ function getSessionCookie(req) {
    return cookies[SESSION_COOKIE_NAME] || null;
 }
 
-function authMiddleware(req, res, next) {
-   // Support static API Key authentication (for Shortcuts / App Intents / third-party tools)
-   const authHeader = req.headers.authorization;
-   if (authHeader && process.env.API_KEY) {
-      if (authHeader === `Bearer ${process.env.API_KEY}`) {
-         req.session = { userId: 'api-key-user', username: 'api-key' };
-         return next();
-      }
-   }
+const SESSION_MAX_AGE = 12 * 60 * 60; // Sekunden
 
+function startSession(res) {
+   const token = signToken({
+      userId: 'admin-user-id',
+      username: 'admin',
+      exp: Date.now() + SESSION_MAX_AGE * 1000
+   }, JWT_SECRET);
+   res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${SESSION_MAX_AGE}`);
+}
+
+function clearSession(res) {
+   res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`);
+}
+
+// Öffnet den Store, ruft fn(store, passkeys) auf und schließt ihn immer wieder.
+// Bei Konfigurations-/DB-Fehlern wird die Antwort hier gesendet und undefined zurückgegeben.
+async function withPasskeyStore(res, fn) {
    const masterKey = process.env.MASTER_KEY;
    if (!masterKey) {
-      return res.status(500).json({ error: 'MASTER_KEY ist nicht konfiguriert.' });
+      res.status(500).json({ error: 'MASTER_KEY ist nicht konfiguriert.' });
+      return undefined;
    }
-
    let store;
-   let passkeysJson;
    try {
       store = new CredentialsStore(masterKey);
-      passkeysJson = store.getEncryptedConfig('auth_passkeys');
-   } catch (error) {
-      return res.status(500).json({ error: 'Datenbankfehler: ' + error.message });
+      const json = store.getEncryptedConfig('auth_passkeys');
+      return await fn(store, json ? JSON.parse(json) : []);
+   } catch (err) {
+      res.status(500).json({ error: 'Datenbankfehler: ' + err.message });
+      return undefined;
    } finally {
       if (store) store.close();
    }
+}
 
-   // If NO passkeys are configured, anyone can access to perform first-time setup!
-   if (!passkeysJson) {
+function expectedOrigins(req) {
+   const host = req.get('host');
+   const origins = [`${req.protocol}://${host}`, `https://${host}`, `http://${host}`];
+   if (req.headers.origin && !origins.includes(req.headers.origin)) {
+      origins.push(req.headers.origin);
+   }
+   return origins;
+}
+
+function saveChallenge(challenge, type) {
+   const challengeId = crypto.randomUUID();
+   activeChallenges.set(challengeId, {
+      challenge,
+      userId: 'admin-user-id',
+      type,
+      expiresAt: Date.now() + 5 * 60 * 1000
+   });
+   return challengeId;
+}
+
+// Liest die Challenge aus dem Request und verbraucht sie; sendet bei Fehler die Antwort und gibt null zurück.
+function takeChallenge(req, res, type) {
+   cleanExpiredChallenges();
+   const { body, challengeId } = req.body;
+   if (!body || !challengeId) {
+      res.status(400).json({ error: 'Fehlende Parameter.' });
+      return null;
+   }
+   const saved = activeChallenges.get(challengeId);
+   if (!saved || saved.type !== type) {
+      res.status(400).json({ error: 'Ungültige oder abgelaufene Challenge.' });
+      return null;
+   }
+   activeChallenges.delete(challengeId);
+   return saved;
+}
+
+// Ohne konfigurierte Passkeys ist alles offen, damit der erste Passkey eingerichtet werden kann.
+async function authMiddleware(req, res, next) {
+   // Static API Key (für Shortcuts / App Intents / Drittwerkzeuge)
+   const authHeader = req.headers.authorization;
+   if (authHeader && process.env.API_KEY && authHeader === `Bearer ${process.env.API_KEY}`) {
+      req.session = { userId: 'api-key-user', username: 'api-key' };
       return next();
    }
 
-   // Session verification
+   const configured = await withPasskeyStore(res, (store, passkeys) => passkeys.length > 0);
+   if (configured === undefined) return;
+   if (!configured) return next();
+
    const token = getSessionCookie(req);
    if (!token) {
       return res.status(401).json({ error: 'Nicht autorisiert: Keine aktive Sitzung.' });
@@ -235,7 +289,7 @@ function authMiddleware(req, res, next) {
 
    const session = verifyToken(token, JWT_SECRET);
    if (!session) {
-      res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`);
+      clearSession(res);
       return res.status(401).json({ error: 'Nicht autorisiert: Sitzung abgelaufen.' });
    }
 
@@ -244,399 +298,188 @@ function authMiddleware(req, res, next) {
 }
 
 // Global API Shield Middleware
+const PUBLIC_API_PATHS = ['/api/auth/status', '/api/auth/login-challenge', '/api/auth/login-verify'];
 app.use((req, res, next) => {
-   const publicPaths = [
-      '/api/auth/status',
-      '/api/auth/login-challenge',
-      '/api/auth/login-verify',
-   ];
-   
-   if (req.path.startsWith('/api/') && !publicPaths.includes(req.path)) {
-      // Setup/Registration endpoints are only public if no passkeys are configured yet
-      if (req.path === '/api/auth/register-challenge' || req.path === '/api/auth/register-verify') {
-         const masterKey = process.env.MASTER_KEY;
-         if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht konfiguriert.' });
-         
-         let store;
-         let passkeysJson;
-         try {
-            store = new CredentialsStore(masterKey);
-            passkeysJson = store.getEncryptedConfig('auth_passkeys');
-         } catch (err) {
-            return res.status(500).json({ error: 'Datenbankfehler: ' + err.message });
-         } finally {
-            if (store) store.close();
-         }
-         
-         if (passkeysJson) {
-            return authMiddleware(req, res, next);
-         } else {
-            return next();
-         }
-      }
-      
+   if (req.path.startsWith('/api/') && !PUBLIC_API_PATHS.includes(req.path)) {
       return authMiddleware(req, res, next);
    }
-   
    next();
 });
 
 // --- WebAuthn Authentication Routes ---
 
-app.get('/api/auth/status', (req, res) => {
-   const masterKey = process.env.MASTER_KEY;
-   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht konfiguriert.' });
-   
-   let store;
-   let passkeysJson = null;
-   try {
-      store = new CredentialsStore(masterKey);
-      passkeysJson = store.getEncryptedConfig('auth_passkeys');
-   } catch (err) {
-      return res.status(500).json({ error: 'Datenbankfehler: ' + err.message });
-   } finally {
-      if (store) store.close();
-   }
-   
+app.get('/api/auth/status', async (req, res) => {
+   const configured = await withPasskeyStore(res, (store, passkeys) => passkeys.length > 0);
+   if (configured === undefined) return;
+
    const token = getSessionCookie(req);
-   const session = token ? verifyToken(token, JWT_SECRET) : null;
-   
    res.json({
-      configured: !!passkeysJson,
-      authenticated: !!session
+      configured,
+      authenticated: !!(token && verifyToken(token, JWT_SECRET))
    });
 });
 
 app.post('/api/auth/register-challenge', async (req, res) => {
-   const masterKey = process.env.MASTER_KEY;
-   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht konfiguriert.' });
-   
-   let store;
-   let existingPasskeys = [];
-   try {
-      store = new CredentialsStore(masterKey);
-      const passkeysJson = store.getEncryptedConfig('auth_passkeys');
-      if (passkeysJson) {
-         existingPasskeys = JSON.parse(passkeysJson);
+   await withPasskeyStore(res, async (store, existingPasskeys) => {
+      try {
+         const options = await generateRegistrationOptions({
+            rpName: 'Actual-FinTS Connector',
+            rpID: req.hostname,
+            userID: Uint8Array.from('admin-user-id', c => c.charCodeAt(0)),
+            userName: 'admin',
+            userDisplayName: 'Admin',
+            attestationType: 'none',
+            authenticatorSelection: {
+               residentKey: 'required',
+               userVerification: 'preferred',
+            },
+            excludeCredentials: existingPasskeys.map(passkey => ({
+               id: passkey.credentialID,
+               type: 'public-key',
+            })),
+         });
+         res.json({ options, challengeId: saveChallenge(options.challenge, 'registration') });
+      } catch (err) {
+         console.error('Registration challenge generation failed:', err);
+         res.status(500).json({ error: 'Challenge-Generierung fehlgeschlagen: ' + err.message });
       }
-   } catch (err) {
-      return res.status(500).json({ error: 'Datenbankfehler: ' + err.message });
-   } finally {
-      if (store) store.close();
-   }
-   
-   const rpId = req.hostname;
-   
-   try {
-      const options = await generateRegistrationOptions({
-         rpName: 'Actual-FinTS Connector',
-         rpID: rpId,
-         userID: Uint8Array.from('admin-user-id', c => c.charCodeAt(0)),
-         userName: 'admin',
-         userDisplayName: 'Admin',
-         attestationType: 'none',
-         authenticatorSelection: {
-            residentKey: 'required',
-            userVerification: 'preferred',
-         },
-         excludeCredentials: existingPasskeys.map(passkey => ({
-            id: passkey.credentialID,
-            type: 'public-key',
-         })),
-      });
-      
-      const challengeId = crypto.randomUUID();
-      activeChallenges.set(challengeId, {
-         challenge: options.challenge,
-         userId: 'admin-user-id',
-         type: 'registration',
-         expiresAt: Date.now() + 5 * 60 * 1000
-      });
-      
-      res.json({
-         options,
-         challengeId
-      });
-   } catch (err) {
-      console.error('Registration challenge generation failed:', err);
-      res.status(500).json({ error: 'Challenge-Generierung fehlgeschlagen: ' + err.message });
-   }
+   });
 });
 
 app.post('/api/auth/register-verify', async (req, res) => {
-   cleanExpiredChallenges();
-   
-   const { body, challengeId, deviceName } = req.body;
-   if (!body || !challengeId) {
-      return res.status(400).json({ error: 'Fehlende Parameter.' });
-   }
-   
-   const saved = activeChallenges.get(challengeId);
-   if (!saved || saved.type !== 'registration') {
-      return res.status(400).json({ error: 'Ungültige oder abgelaufene Challenge.' });
-   }
-   activeChallenges.delete(challengeId);
-   
-   const masterKey = process.env.MASTER_KEY;
-   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht konfiguriert.' });
-   
-   let store;
-   let existingPasskeys = [];
-   try {
-      store = new CredentialsStore(masterKey);
-      const passkeysJson = store.getEncryptedConfig('auth_passkeys');
-      if (passkeysJson) {
-         existingPasskeys = JSON.parse(passkeysJson);
-      }
-   } catch (err) {
-      return res.status(500).json({ error: 'Datenbankfehler: ' + err.message });
-   }
-   
-   const rpId = req.hostname;
-   const expectedOrigin = [
-      `${req.protocol}://${req.get('host')}`,
-      `https://${req.get('host')}`,
-      `http://${req.get('host')}`
-   ];
-   if (req.headers.origin && !expectedOrigin.includes(req.headers.origin)) {
-      expectedOrigin.push(req.headers.origin);
-   }
-   
-   try {
-      const verification = await verifyRegistrationResponse({
-         response: body,
-         expectedChallenge: saved.challenge,
-         expectedOrigin,
-         expectedRPID: rpId,
-      });
-      
-      if (verification.verified && verification.registrationInfo) {
+   const saved = takeChallenge(req, res, 'registration');
+   if (!saved) return;
+   const { body, deviceName } = req.body;
+
+   await withPasskeyStore(res, async (store, existingPasskeys) => {
+      try {
+         const verification = await verifyRegistrationResponse({
+            response: body,
+            expectedChallenge: saved.challenge,
+            expectedOrigin: expectedOrigins(req),
+            expectedRPID: req.hostname,
+         });
+
+         if (!verification.verified || !verification.registrationInfo) {
+            return res.status(400).json({ error: 'Verifizierung fehlgeschlagen.' });
+         }
+
          const { credential } = verification.registrationInfo;
-         
-         const newPasskey = {
+         existingPasskeys.push({
             credentialID: credential.id,
             publicKey: Buffer.from(credential.publicKey).toString('base64'),
             counter: credential.counter,
             transports: body.response.transports || [],
             deviceName: deviceName || body.authenticatorAttachment || 'Unbekanntes Gerät',
             createdAt: new Date().toISOString()
-         };
-         
-         existingPasskeys.push(newPasskey);
+         });
          store.setEncryptedConfig('auth_passkeys', JSON.stringify(existingPasskeys));
-         
+
          // Automatisches Login nach Registrierung
-         const token = signToken({
-            userId: 'admin-user-id',
-            username: 'admin',
-            exp: Date.now() + 30 * 24 * 60 * 60 * 1000
-         }, JWT_SECRET);
-         
-         res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${30 * 24 * 60 * 60}`);
+         startSession(res);
          res.json({ verified: true });
-      } else {
-         res.status(400).json({ error: 'Verifizierung fehlgeschlagen.' });
+      } catch (err) {
+         console.error('Registration verification failed:', err);
+         res.status(400).json({ error: 'Registrierung fehlgeschlagen: ' + err.message });
       }
-   } catch (err) {
-      console.error('Registration verification failed:', err);
-      res.status(400).json({ error: 'Registrierung fehlgeschlagen: ' + err.message });
-   } finally {
-      if (store) store.close();
-   }
+   });
 });
 
 app.post('/api/auth/login-challenge', async (req, res) => {
    cleanExpiredChallenges();
-   
-   const masterKey = process.env.MASTER_KEY;
-   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht konfiguriert.' });
-   
-   let store;
-   let existingPasskeys = [];
-   try {
-      store = new CredentialsStore(masterKey);
-      const passkeysJson = store.getEncryptedConfig('auth_passkeys');
-      if (!passkeysJson) {
+
+   await withPasskeyStore(res, async (store, existingPasskeys) => {
+      if (!existingPasskeys.length) {
          return res.status(400).json({ error: 'Keine Passkeys registriert.' });
       }
-      existingPasskeys = JSON.parse(passkeysJson);
-   } catch (err) {
-      return res.status(500).json({ error: 'Datenbankfehler: ' + err.message });
-   } finally {
-      if (store) store.close();
-   }
-   
-   const rpId = req.hostname;
-   
-   try {
-      const options = await generateAuthenticationOptions({
-         rpID: rpId,
-         allowCredentials: existingPasskeys.map(passkey => ({
-            id: passkey.credentialID,
-            type: 'public-key',
-            transports: passkey.transports,
-         })),
-         userVerification: 'preferred',
-      });
-      
-      const challengeId = crypto.randomUUID();
-      activeChallenges.set(challengeId, {
-         challenge: options.challenge,
-         userId: 'admin-user-id',
-         type: 'login',
-         expiresAt: Date.now() + 5 * 60 * 1000
-      });
-      
-      res.json({
-         options,
-         challengeId
-      });
-   } catch (err) {
-      console.error('Authentication challenge generation failed:', err);
-      res.status(500).json({ error: 'Login-Challenge konnte nicht generiert werden: ' + err.message });
-   }
+      try {
+         const options = await generateAuthenticationOptions({
+            rpID: req.hostname,
+            allowCredentials: existingPasskeys.map(passkey => ({
+               id: passkey.credentialID,
+               type: 'public-key',
+               transports: passkey.transports,
+            })),
+            userVerification: 'preferred',
+         });
+         res.json({ options, challengeId: saveChallenge(options.challenge, 'login') });
+      } catch (err) {
+         console.error('Authentication challenge generation failed:', err);
+         res.status(500).json({ error: 'Login-Challenge konnte nicht generiert werden: ' + err.message });
+      }
+   });
 });
 
 app.post('/api/auth/login-verify', async (req, res) => {
-   cleanExpiredChallenges();
-   
-   const { body, challengeId } = req.body;
-   if (!body || !challengeId) {
-      return res.status(400).json({ error: 'Fehlende Parameter.' });
-   }
-   
-   const saved = activeChallenges.get(challengeId);
-   if (!saved || saved.type !== 'login') {
-      return res.status(400).json({ error: 'Ungültige oder abgelaufene Challenge.' });
-   }
-   activeChallenges.delete(challengeId);
-   
-   const masterKey = process.env.MASTER_KEY;
-   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht konfiguriert.' });
-   
-   let store;
-   let existingPasskeys = [];
-   try {
-      store = new CredentialsStore(masterKey);
-      const passkeysJson = store.getEncryptedConfig('auth_passkeys');
-      if (!passkeysJson) {
+   const saved = takeChallenge(req, res, 'login');
+   if (!saved) return;
+   const { body } = req.body;
+
+   await withPasskeyStore(res, async (store, existingPasskeys) => {
+      if (!existingPasskeys.length) {
          return res.status(400).json({ error: 'Keine Passkeys registriert.' });
       }
-      existingPasskeys = JSON.parse(passkeysJson);
-   } catch (err) {
-      return res.status(500).json({ error: 'Datenbankfehler: ' + err.message });
-   }
-   
-   const rpId = req.hostname;
-   const expectedOrigin = [
-      `${req.protocol}://${req.get('host')}`,
-      `https://${req.get('host')}`,
-      `http://${req.get('host')}`
-   ];
-   if (req.headers.origin && !expectedOrigin.includes(req.headers.origin)) {
-      expectedOrigin.push(req.headers.origin);
-   }
-   
-   const passkey = existingPasskeys.find(pk => pk.credentialID === body.id);
-   if (!passkey) {
-      if (store) store.close();
-      return res.status(400).json({ error: 'Passkey nicht in Datenbank gefunden.' });
-   }
-   
-   try {
-      const verification = await verifyAuthenticationResponse({
-         response: body,
-         expectedChallenge: saved.challenge,
-         expectedOrigin,
-         expectedRPID: rpId,
-         credential: {
-            id: passkey.credentialID,
-            publicKey: Buffer.from(passkey.publicKey, 'base64'),
-            counter: passkey.counter,
-            transports: passkey.transports
+      const passkey = existingPasskeys.find(pk => pk.credentialID === body.id);
+      if (!passkey) {
+         return res.status(400).json({ error: 'Passkey nicht in Datenbank gefunden.' });
+      }
+
+      try {
+         const verification = await verifyAuthenticationResponse({
+            response: body,
+            expectedChallenge: saved.challenge,
+            expectedOrigin: expectedOrigins(req),
+            expectedRPID: req.hostname,
+            credential: {
+               id: passkey.credentialID,
+               publicKey: Buffer.from(passkey.publicKey, 'base64'),
+               counter: passkey.counter,
+               transports: passkey.transports
+            }
+         });
+
+         if (!verification.verified || !verification.authenticationInfo) {
+            return res.status(400).json({ error: 'Verifizierung fehlgeschlagen.' });
          }
-      });
-      
-      if (verification.verified && verification.authenticationInfo) {
+
          passkey.counter = verification.authenticationInfo.newCounter;
          store.setEncryptedConfig('auth_passkeys', JSON.stringify(existingPasskeys));
-         
-         const token = signToken({
-            userId: 'admin-user-id',
-            username: 'admin',
-            exp: Date.now() + 30 * 24 * 60 * 60 * 1000
-         }, JWT_SECRET);
-         
-         res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${30 * 24 * 60 * 60}`);
+         startSession(res);
          res.json({ verified: true });
-      } else {
-         res.status(400).json({ error: 'Verifizierung fehlgeschlagen.' });
+      } catch (err) {
+         console.error('Authentication verification failed:', err);
+         res.status(400).json({ error: 'Login-Verifizierung fehlgeschlagen: ' + err.message });
       }
-   } catch (err) {
-      console.error('Authentication verification failed:', err);
-      res.status(400).json({ error: 'Login-Verifizierung fehlgeschlagen: ' + err.message });
-   } finally {
-      if (store) store.close();
-   }
+   });
 });
 
 app.post('/api/auth/logout', (req, res) => {
-   res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`);
+   clearSession(res);
    res.json({ success: true });
 });
 
-app.get('/api/auth/devices', (req, res) => {
-   const masterKey = process.env.MASTER_KEY;
-   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht konfiguriert.' });
-   
-   let store;
-   let existingPasskeys = [];
-   try {
-      store = new CredentialsStore(masterKey);
-      const passkeysJson = store.getEncryptedConfig('auth_passkeys');
-      if (passkeysJson) {
-         existingPasskeys = JSON.parse(passkeysJson);
-      }
-   } catch (err) {
-      return res.status(500).json({ error: 'Datenbankfehler: ' + err.message });
-   } finally {
-      if (store) store.close();
-   }
-   
-   res.json(existingPasskeys.map(pk => ({
+app.get('/api/auth/devices', async (req, res) => {
+   const devices = await withPasskeyStore(res, (store, passkeys) => passkeys.map(pk => ({
       deviceName: pk.deviceName,
       createdAt: pk.createdAt,
       credentialID: pk.credentialID
    })));
+   if (devices) res.json(devices);
 });
 
-app.delete('/api/auth/devices/:id', (req, res) => {
-   const credentialID = req.params.id;
-   const masterKey = process.env.MASTER_KEY;
-   if (!masterKey) return res.status(500).json({ error: 'MASTER_KEY ist nicht konfiguriert.' });
-   
-   let store;
-   try {
-      store = new CredentialsStore(masterKey);
-      const passkeysJson = store.getEncryptedConfig('auth_passkeys');
-      if (passkeysJson) {
-         let existingPasskeys = JSON.parse(passkeysJson);
-         existingPasskeys = existingPasskeys.filter(pk => pk.credentialID !== credentialID);
-         
-         if (existingPasskeys.length > 0) {
-            store.setEncryptedConfig('auth_passkeys', JSON.stringify(existingPasskeys));
-         } else {
-            store.deleteConfig('auth_passkeys');
-         }
-         res.json({ success: true });
-      } else {
-         res.status(404).json({ error: 'Keine Geräte gefunden.' });
+app.delete('/api/auth/devices/:id', async (req, res) => {
+   await withPasskeyStore(res, (store, passkeys) => {
+      if (!passkeys.length) {
+         return res.status(404).json({ error: 'Keine Geräte gefunden.' });
       }
-   } catch (err) {
-      res.status(500).json({ error: 'Datenbankfehler: ' + err.message });
-   } finally {
-      if (store) store.close();
-   }
+      const remaining = passkeys.filter(pk => pk.credentialID !== req.params.id);
+      if (remaining.length > 0) {
+         store.setEncryptedConfig('auth_passkeys', JSON.stringify(remaining));
+      } else {
+         store.deleteConfig('auth_passkeys');
+      }
+      res.json({ success: true });
+   });
 });
 
 // --- PWA Web-Push Endpoints ---
