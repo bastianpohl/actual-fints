@@ -1642,8 +1642,8 @@ document.addEventListener('DOMContentLoaded', () => {
                if (lockDesc) lockDesc.textContent = 'Erstelle deinen ersten Passkey, um den Actual-FinTS Connector abzusichern.';
                if (lockSetupContainer) lockSetupContainer.style.display = 'flex';
                if (lockLoginBtn) lockLoginBtn.style.display = 'none';
-            } else if (!data.authenticated) {
-               // Locked Mode
+            } else if (!data.authenticated || !sessionStorage.getItem('tab_unlocked')) {
+               // Locked Mode (auch bei gültigem Cookie, wenn der Tab neu geöffnet wurde)
                if (lockScreen) {
                   lockScreen.style.display = 'flex';
                   lockScreen.style.opacity = '1';
@@ -1723,6 +1723,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const verifyResult = await resVerify.json();
             if (verifyResult.verified) {
+               sessionStorage.setItem('tab_unlocked', '1');
                showToast('Erfolgreich entsperrt!', 'success');
                if (lockScreen) {
                   lockScreen.style.opacity = '0';
@@ -1793,6 +1794,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const verifyResult = await resVerify.json();
             if (verifyResult.verified) {
+               sessionStorage.setItem('tab_unlocked', '1');
                showToast('Passkey erfolgreich eingerichtet!', 'success');
                if (!isFromSettings) {
                   if (lockScreen) {

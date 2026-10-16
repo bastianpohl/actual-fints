@@ -204,7 +204,7 @@ function startSession(res) {
       username: 'admin',
       exp: Date.now() + SESSION_MAX_AGE * 1000
    }, JWT_SECRET);
-   res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${SESSION_MAX_AGE}`);
+   res.setHeader('Set-Cookie', `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict`);
 }
 
 function clearSession(res) {
