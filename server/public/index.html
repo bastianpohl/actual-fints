@@ -376,14 +376,14 @@
                      </div>
                      <div class="form-group" style="margin-bottom:0.25rem;">
                         <label for="ab-sync-input" style="font-size:0.75rem; color: var(--text-secondary);">Budget Sync ID</label>
-                        <input type="text" id="ab-sync-input" class="input-field" style="font-family: var(--font-mono); font-size:0.85rem; padding:0.4rem 0.6rem; height:36px; margin-top:0.25rem;" placeholder="z.B. user-sync-id">
+                        <input type="text" autocomplete="off" id="ab-sync-input" class="input-field" style="font-family: var(--font-mono); font-size:0.85rem; padding:0.4rem 0.6rem; height:36px; margin-top:0.25rem;" placeholder="z.B. user-sync-id">
                      </div>
                      <div class="form-group" style="margin-bottom:0.25rem;">
                         <label for="ab-pass-input" style="font-size:0.75rem; color: var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
                            Passwort / Token
                            <button id="btn-ab-show-pass" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.75rem; padding:0; outline:none;">Anzeigen</button>
                         </label>
-                        <input type="password" id="ab-pass-input" class="input-field" style="font-size:0.85rem; padding:0.4rem 0.6rem; height:36px; margin-top:0.25rem;" placeholder="Unverändert lassen oder neues Passwort eingeben">
+                        <input type="password" autocomplete="new-password" id="ab-pass-input" class="input-field" style="font-size:0.85rem; padding:0.4rem 0.6rem; height:36px; margin-top:0.25rem;" placeholder="Unverändert lassen oder neues Passwort eingeben">
                      </div>
                      
                      <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:1.25rem;">
@@ -526,13 +526,13 @@
                   </div>
                   <div class="form-group">
                      <label for="bank-input-login">Online-Banking Login</label>
-                     <input type="text" id="bank-input-login" class="input-field" required placeholder="Benutzername/Kontonr">
+                     <input type="text" autocomplete="off" id="bank-input-login" class="input-field" required placeholder="Benutzername/Kontonr">
                   </div>
                </div>
 
                <div class="form-group">
                   <label for="bank-input-pin">Online-Banking PIN</label>
-                  <input type="password" id="bank-input-pin" class="input-field" required placeholder="Passwort/PIN">
+                  <input type="password" autocomplete="new-password" id="bank-input-pin" class="input-field" required placeholder="Passwort/PIN">
                   <span style="font-size:0.75rem; color:var(--text-muted);">Deine PIN wird ausschließlich AES-256-GCM-verschlüsselt in credentials.db gespeichert.</span>
                </div>
 
