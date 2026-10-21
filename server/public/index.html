@@ -116,6 +116,19 @@
             </div>
          </div>
 
+         <!-- Account balances (live via FinTS) -->
+         <div class="dashboard-grid" style="grid-template-columns: 1fr;">
+            <div class="glass-card" id="balances-card">
+               <div class="sync-header">
+                  <h2>Kontostände</h2>
+                  <button type="button" class="btn secondary" id="balances-refresh-btn" title="Neu laden" style="width:auto; padding:0.3rem 0.5rem;">
+                     <span class="material-icons" style="font-size:1.2rem;">refresh</span>
+                  </button>
+               </div>
+               <div id="balances-list" style="color: var(--text-secondary); font-size:0.9rem;">Lade...</div>
+            </div>
+         </div>
+
          <!-- Sync Operations Grid (Full width for Sync Box) -->
          <div class="dashboard-grid" style="grid-template-columns: 1fr;">
             <!-- Sync Action Box -->

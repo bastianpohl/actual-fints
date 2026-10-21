@@ -969,6 +969,7 @@ app.get('/api/banks/balances', async (req, res) => {
                      name: displayName,
                      productName: bal.productName || null,
                      balance: bal.bookedBalance,
+                     pendingBalance: bal.pendingBalance ?? 0,
                      actualBalance: actualBal,
                      currency: bal.currency || 'EUR',
                      bankName: bank.name,

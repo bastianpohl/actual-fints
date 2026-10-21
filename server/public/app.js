@@ -248,7 +248,48 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 1. Fetch System Status
-    const loadStatus = async () => {
+    // --- ACCOUNT BALANCES (live from the banks via FinTS) ---
+   const eur = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+   const loadBalances = async () => {
+      const list = document.getElementById('balances-list');
+      if (!list) return;
+      list.textContent = 'Lade...';
+      try {
+         const res = await fetch('/api/banks/balances');
+         const data = await res.json();
+         if (!res.ok) throw new Error(data.error || res.statusText);
+         const money = (v) => `<span style="color:${v < 0 ? 'var(--danger)' : 'var(--text-primary)'}">${eur.format(v)}</span>`;
+         // Same check as the iOS app: bank balance vs. Actual balance
+         const sync = (b) => {
+            if (b.actualBalance == null) return '';
+            const delta = b.balance - b.actualBalance;
+            return Math.abs(delta) < 0.01
+               ? '<div style="font-size:0.8rem; color:var(--success);">Synchron</div>'
+               : `<div style="font-size:0.8rem; color:var(--danger);">Actual: ${eur.format(b.actualBalance)} (Delta: ${delta > 0 ? '+' : ''}${eur.format(delta)})</div>`;
+         };
+         const rows = data.balances.map(b => `
+            <div style="display:flex; justify-content:space-between; gap:1rem; padding:0.5rem 0; border-top:1px solid var(--card-border);">
+               <div style="min-width:0;">
+                  <div style="color:var(--text-primary); font-weight:600;">${escapeHtml(b.name)}</div>
+                  <div style="font-size:0.8rem;">${escapeHtml(b.bankName)}</div>
+               </div>
+               <div style="text-align:right; white-space:nowrap;">
+                  <div style="font-weight:700;">${money(b.balance)}</div>
+                  ${b.pendingBalance ? `<div style="font-size:0.8rem;">vorgemerkt: ${money(b.pendingBalance)}</div>` : ''}
+                  ${sync(b)}
+               </div>
+            </div>`).join('');
+         const total = data.balances.reduce((a, b) => a + b.balance, 0);
+         const pending = data.balances.reduce((a, b) => a + (b.pendingBalance || 0), 0);
+         const errs = (data.errors || []).map(e => `<div style="color:var(--danger);">${escapeHtml(e.bankName)}: ${escapeHtml(e.error)}</div>`).join('');
+         list.innerHTML = (rows ? `<div style="margin-bottom:0.5rem;">Gesamt: <b>${money(total)}</b>${pending ? ` · vorgemerkt: <b>${money(pending)}</b>` : ''}</div>${rows}` : 'Keine Konten.') + errs;
+      } catch (err) {
+         list.innerHTML = `<span style="color:var(--danger);">${escapeHtml(err.message)}</span>`;
+      }
+   };
+   document.getElementById('balances-refresh-btn')?.addEventListener('click', loadBalances);
+
+   const loadStatus = async () => {
        try {
           const res = await fetch('/api/status');
           const data = await res.json();
@@ -1913,6 +1954,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       function initAppData() {
          loadStatus();
+         loadBalances();
          loadBanks();
          loadAbConfig();
          loadActualAccounts();
