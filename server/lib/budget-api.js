@@ -146,11 +146,26 @@ class BudgetClient {
       return convertTransaction(transaction, this.#activeAccount);
    }
 
+   // Actual's fuzzy match (±7 days, same amount) swallows a new booking when a reconciled booking
+   // without imported_id sits nearby, e.g. a manual entry. The import then ignores it forever.
+   // Bookings from another day than the match are real, so force-add them. Same day stays a dedup.
+   async #forceAddShadowedTransactions(transactions) {
+      const { findReconciledMatches } = require('../utils/reconcile');
+      const existingIds = await this.getExistingImportedIds();
+      if (transactions.every(t => existingIds.has(t.imported_id))) return;
+      const { updatedPreview } = await api.importTransactions(this.#activeAccount, transactions, { dryRun: true });
+      const ignored = updatedPreview.filter(p => p.ignored);
+      for (const { trans, diffDays } of findReconciledMatches(this.#AB_PATH, ignored, existingIds)) {
+         if (diffDays > 0) transactions.find(t => t.imported_id === trans.imported_id).forceAddTransaction = true;
+      }
+   }
+
    async importTransactions(transactions) {
       if (!Array.isArray(transactions) || !transactions.length) return { added: [], updated: [], errors: [] };
       if (!this.#activeAccount) throw new Error("No active account id set");
       // Resolve any pending promises in the transactions array (works for plain values too)
       const resolvedTransactions = await Promise.all(transactions);
+      await this.#forceAddShadowedTransactions(resolvedTransactions);
       const result = await api.importTransactions(this.#activeAccount, resolvedTransactions);
       return result;
    }

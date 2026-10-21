@@ -14,7 +14,7 @@ test('findReconciledMatches: nächste abgeglichene Buchung innerhalb von 7 Tagen
   db.exec(`CREATE TABLE transactions (id TEXT, acct TEXT, amount INTEGER, date TEXT, description TEXT, notes TEXT,
     reconciled INTEGER, financial_id TEXT, tombstone INTEGER, isChild INTEGER)`);
   const ins = db.prepare('INSERT INTO transactions VALUES (?, ?, ?, ?, ?, NULL, ?, ?, 0, 0)');
-  ins.run('near', 'a1', -1000, '2026-09-27', 'p-near', 1, null);   // 1 Tag Abstand
+  ins.run('near', 'a1', -1000, BigInt(20260927), 'p-near', 1, null); // 1 Tag Abstand, Integer-Datum wie in Actual
   ins.run('far', 'a1', -1000, '2026-09-20', 'p-far', 1, null);     // 8 Tage: außerhalb
   ins.run('bank', 'a1', -1000, '2026-09-28', 'p-bank', 1, 'fid');  // hat financial_id: kein Kandidat
   ins.run('other', 'a1', -2000, '2026-09-28', 'p-other', 1, null); // anderer Betrag

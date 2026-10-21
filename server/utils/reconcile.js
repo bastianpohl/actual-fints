@@ -156,7 +156,8 @@ function findReconciledMatches(dataDir, ignoredList, existingIds) {
       const found = [];
       for (const { transaction: trans } of fresh) {
          const target = new Date(trans.date);
-         const distance = c => Math.abs(target - new Date(c.date));
+         // Actual stores dates as integers (20261006); the test fixtures use ISO text
+      const distance = c => Math.abs(target - new Date(String(c.date).replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3')));
          const [bestMatch] = stmt.all(trans.account, trans.amount)
             .filter(c => Math.ceil(distance(c) / DAY_MS) <= 7)
             .sort((a, b) => distance(a) - distance(b));
