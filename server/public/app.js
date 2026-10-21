@@ -253,11 +253,25 @@ document.addEventListener('DOMContentLoaded', () => {
    const loadBalances = async () => {
       const list = document.getElementById('balances-list');
       if (!list) return;
-      list.textContent = 'Lade...';
+      list.style.opacity = '0.6';
       try {
          const res = await fetch('/api/banks/balances');
          const data = await res.json();
          if (!res.ok) throw new Error(data.error || res.statusText);
+         data.fetchedAt = Date.now();
+         // ponytail: Snapshot nur pro Browser (localStorage); serverseitig erst, wenn Cron-Läufe ihn ebenfalls fortschreiben sollen
+         try { if (!data.errors?.length) localStorage.setItem('balances', JSON.stringify(data)); } catch {}
+         renderBalances(data);
+      } catch (err) {
+         if (!list.querySelector('[data-snapshot]')) list.innerHTML = `<span style="color:var(--danger);">${escapeHtml(err.message)}</span>`;
+         else showToast(`Kontostände nicht aktualisiert: ${err.message}`, 'error');
+      } finally {
+         list.style.opacity = '';
+      }
+   };
+   const renderBalances = (data) => {
+      const list = document.getElementById('balances-list');
+      {
          const money = (v) => `<span style="color:${v < 0 ? 'var(--danger)' : 'var(--text-primary)'}">${eur.format(v)}</span>`;
          // Same check as the iOS app: bank balance vs. Actual balance
          const sync = (b) => {
@@ -282,11 +296,12 @@ document.addEventListener('DOMContentLoaded', () => {
          const total = data.balances.reduce((a, b) => a + b.balance, 0);
          const pending = data.balances.reduce((a, b) => a + (b.pendingBalance || 0), 0);
          const errs = (data.errors || []).map(e => `<div style="color:var(--danger);">${escapeHtml(e.bankName)}: ${escapeHtml(e.error)}</div>`).join('');
-         list.innerHTML = (rows ? `<div style="margin-bottom:0.5rem;">Gesamt: <b>${money(total)}</b>${pending ? ` · vorgemerkt: <b>${money(pending)}</b>` : ''}</div>${rows}` : 'Keine Konten.') + errs;
-      } catch (err) {
-         list.innerHTML = `<span style="color:var(--danger);">${escapeHtml(err.message)}</span>`;
+         const stand = data.fetchedAt ? `<div data-snapshot style="font-size:0.8rem; margin-top:0.5rem;">Stand: ${new Date(data.fetchedAt).toLocaleString('de-DE')}</div>` : '';
+         list.innerHTML = (rows ? `<div style="margin-bottom:0.5rem;">Gesamt: <b>${money(total)}</b>${pending ? ` · vorgemerkt: <b>${money(pending)}</b>` : ''}</div>${rows}` : 'Keine Konten.') + errs + stand;
       }
    };
+   // letzten Stand sofort zeigen, Aktualisierung läuft im Hintergrund
+   try { const snap = JSON.parse(localStorage.getItem('balances')); if (snap) renderBalances(snap); } catch {}
    document.getElementById('balances-refresh-btn')?.addEventListener('click', loadBalances);
 
    const loadStatus = async () => {
@@ -585,6 +600,42 @@ document.addEventListener('DOMContentLoaded', () => {
       }
    };
 
+   // --- SYNC RESULT TABLE (Filter + Suche, analog zum Lauf-Detail) ---
+   let syncTxs = [];
+   const syncFilter = { status: null };
+   const syncFilterBar = document.getElementById('sync-filter');
+   const syncFilterDir = document.getElementById('sync-filter-dir');
+   const syncFilterQ = document.getElementById('sync-filter-q');
+   const renderSyncTxs = () => {
+      const q = syncFilterQ.value.trim().toLowerCase(), dir = syncFilterDir.value;
+      for (const st of ['added', 'ignored']) {
+         const n = syncTxs.filter(t => (t.status === 'added') === (st === 'added')).length;
+         document.getElementById(`sync-count-${st}`).textContent = n;
+         const btn = syncFilterBar.querySelector(`[data-status="${st}"]`);
+         btn.classList.toggle('zero', !n);
+         btn.disabled = !n;
+         btn.classList.toggle('active', syncFilter.status === st);
+      }
+      syncResultsTableBody.innerHTML = syncTxs.filter(tx =>
+         (!syncFilter.status || (tx.status === 'added') === (syncFilter.status === 'added')) &&
+         (dir === 'all' || (dir === 'debit') === (tx.amount < 0)) &&
+         (!q || `${tx.payee} ${tx.account} ${tx.date}`.toLowerCase().includes(q))
+      ).map(tx => `
+         <tr class="sync-tx-row">
+            <td class="sync-tx-date">${escapeHtml(formatDate(tx.date))}</td>
+            <td class="sync-tx-account">${escapeHtml(tx.account)}</td>
+            <td class="sync-tx-payee" title="${escapeHtml(tx.payee)}">${escapeHtml(tx.payee)}</td>
+            <td class="sync-tx-amount ${tx.amount > 0 ? 'credit' : 'debit'}">${formatAmount(tx.amount)}</td>
+            <td class="sync-tx-status"><span class="status-badge-inline ${tx.status === 'added' ? 'added' : 'ignored'}">${tx.status === 'added' ? 'Hinzugefügt' : 'Bereits importiert'}</span></td>
+         </tr>`).join('') || '<tr><td colspan="5" style="padding:1rem; text-align:center; color:var(--text-muted);">Keine Umsätze für diesen Filter.</td></tr>';
+   };
+   syncFilterBar.addEventListener('click', (e) => {
+      const c = e.target.closest('[data-status]');
+      if (c) { syncFilter.status = syncFilter.status === c.dataset.status ? null : c.dataset.status; renderSyncTxs(); }
+   });
+   syncFilterDir.addEventListener('change', renderSyncTxs);
+   syncFilterQ.addEventListener('input', renderSyncTxs);
+
    // --- SYNC OPERATION ---
    startSyncBtn.addEventListener('click', async () => {
       const startVal = document.getElementById('sync-start-date').value;
@@ -611,41 +662,15 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast('Synchronisation erfolgreich abgeschlossen!');
             syncInfoMsg.textContent = 'Umsätze geladen und importiert.';
             loadStatus();
+            loadBalances();
             
             // Display transactions visualization
             if (data.results && data.results.length > 0) {
-               syncResultsTableBody.innerHTML = '';
-               let txInjected = 0;
-               
-               data.results.forEach(accResult => {
-                  if (accResult.transactions && accResult.transactions.length > 0) {
-                     accResult.transactions.forEach(tx => {
-                        const row = document.createElement('tr');
-                        row.className = 'sync-tx-row';
-                        
-                        const isCredit = tx.amount > 0;
-                        const amountClass = isCredit ? 'credit' : 'debit';
-                        const badgeMap = {
-                           added: { cls: 'added', text: 'Hinzugefügt' }
-                        };
-                        const badge = badgeMap[tx.status] || { cls: 'ignored', text: 'Bereits importiert' };
-                        const badgeClass = badge.cls;
-                        const badgeText = badge.text;
-                        
-                        row.innerHTML = `
-                           <td class="sync-tx-date">${escapeHtml(formatDate(tx.date))}</td>
-                           <td class="sync-tx-account">${escapeHtml(accResult.account)}</td>
-                           <td class="sync-tx-payee" title="${escapeHtml(tx.payee)}">${escapeHtml(tx.payee)}</td>
-                           <td class="sync-tx-amount ${amountClass}">${formatAmount(tx.amount)}</td>
-                           <td class="sync-tx-status">
-                              <span class="status-badge-inline ${badgeClass}">${badgeText}</span>
-                           </td>
-                        `;
-                        syncResultsTableBody.appendChild(row);
-                        txInjected++;
-                     });
-                  }
-               });
+               syncTxs = data.results.flatMap(r => (r.transactions || []).map(tx => ({ ...tx, account: r.account })));
+               syncFilter.status = null;
+               syncFilterQ.value = '';
+               const txInjected = syncTxs.length;
+               renderSyncTxs();
 
                if (txInjected > 0) {
                   syncResultsCard.style.display = 'block';

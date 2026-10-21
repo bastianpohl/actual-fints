@@ -180,6 +180,14 @@
                </h2>
                <button class="btn secondary" id="close-sync-results-btn" style="padding:0.35rem 0.75rem; font-size:0.8rem;">Ausblenden</button>
             </div>
+            <div class="run-detail-chips" id="sync-filter" style="margin-bottom: 0.75rem;">
+               <div class="run-chips">
+                  <button type="button" class="run-chip success" data-status="added" title="Hinzugefügt"><span class="material-icons">download_done</span><span id="sync-count-added">0</span></button>
+                  <button type="button" class="run-chip muted" data-status="ignored" title="Bereits importiert"><span class="material-icons">block</span><span id="sync-count-ignored">0</span></button>
+               </div>
+               <select id="sync-filter-dir"><option value="all">Alle</option><option value="credit">Einnahmen</option><option value="debit">Ausgaben</option></select>
+               <input type="search" id="sync-filter-q" placeholder="Suchen…" aria-label="Umsätze durchsuchen">
+            </div>
             <div class="table-scroll-container" style="max-height: 400px; overflow-y: auto;">
                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
                   <thead>
