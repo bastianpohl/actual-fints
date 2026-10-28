@@ -253,7 +253,8 @@ document.addEventListener('DOMContentLoaded', () => {
    const loadBalances = async () => {
       const list = document.getElementById('balances-list');
       if (!list) return;
-      list.style.opacity = '0.6';
+      const status = document.getElementById('balances-status');
+      status.style.display = 'inline-flex';
       try {
          const res = await fetch('/api/banks/balances');
          const data = await res.json();
@@ -266,7 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
          if (!list.querySelector('[data-snapshot]')) list.innerHTML = `<span style="color:var(--danger);">${escapeHtml(err.message)}</span>`;
          else showToast(`Kontostände nicht aktualisiert: ${err.message}`, 'error');
       } finally {
-         list.style.opacity = '';
+         status.style.display = 'none';
       }
    };
    const renderBalances = (data) => {
@@ -297,12 +298,11 @@ document.addEventListener('DOMContentLoaded', () => {
          const pending = data.balances.reduce((a, b) => a + (b.pendingBalance || 0), 0);
          const errs = (data.errors || []).map(e => `<div style="color:var(--danger);">${escapeHtml(e.bankName)}: ${escapeHtml(e.error)}</div>`).join('');
          const stand = data.fetchedAt ? `<div data-snapshot style="font-size:0.8rem; margin-top:0.5rem;">Stand: ${new Date(data.fetchedAt).toLocaleString('de-DE')}</div>` : '';
-         list.innerHTML = (rows ? `<div style="margin-bottom:0.5rem;">Gesamt: <b>${money(total)}</b>${pending ? ` · vorgemerkt: <b>${money(pending)}</b>` : ''}</div>${rows}` : 'Keine Konten.') + errs + stand;
+         list.innerHTML = (rows ? `<div style="margin-bottom:0.5rem;">Gesamt: <b>${money(total)}</b> · vorgemerkt: <b>${money(pending)}</b></div>${rows}` : 'Keine Konten.') + errs + stand;
       }
    };
    // letzten Stand sofort zeigen, Aktualisierung läuft im Hintergrund
    try { const snap = JSON.parse(localStorage.getItem('balances')); if (snap) renderBalances(snap); } catch {}
-   document.getElementById('balances-refresh-btn')?.addEventListener('click', loadBalances);
 
    const loadStatus = async () => {
        try {
