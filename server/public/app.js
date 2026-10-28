@@ -1692,6 +1692,19 @@ document.addEventListener('DOMContentLoaded', () => {
          return base64.replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
       }
 
+      // Abgelaufene Sitzung: jede 401-Antwort der API führt zurück zum Login (einmal pro Ablauf)
+      const originalFetch = window.fetch.bind(window);
+      let relocking = false;
+      window.fetch = async (input, init) => {
+         const res = await originalFetch(input, init);
+         const url = typeof input === 'string' ? input : input.url;
+         if (res.status === 401 && !/^\/api\/auth\/(status|login-|register-)/.test(url) && !relocking) {
+            relocking = true;
+            checkAuthStatus().finally(() => { relocking = false; });
+         }
+         return res;
+      };
+
       // --- AUTHENTICATION FLOWS ---
       async function checkAuthStatus() {
          try {
