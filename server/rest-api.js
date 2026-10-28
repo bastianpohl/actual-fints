@@ -962,6 +962,25 @@ app.get('/api/banks/balances', async (req, res) => {
                      }
                   }
 
+                  // Individual pending (vorgemerkte) bookings; null if the bank does not deliver them
+                  let pendingTransactions = null;
+                  try {
+                     const { convertAmount, getNotes, getPayeeName } = require('./utils/convert');
+                     const isoDate = d => d instanceof Date
+                        ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                        : String(d || '').slice(0, 10);
+                     client.setAccount(acc.iban);
+                     const pending = await client.getPendingTransactions(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), new Date());
+                     pendingTransactions = pending.map(t => ({
+                        date: isoDate(t.valueDate || t.entryDate),
+                        payee: getPayeeName(t),
+                        purpose: getNotes(t),
+                        amount: convertAmount(t.amount, t.isCredit) / 100
+                     }));
+                  } catch (pendErr) {
+                     console.error(`Vorgemerkte Umsätze für ${acc.iban} nicht abrufbar:`, pendErr.message);
+                  }
+
                   const actualBal = actualBalances[displayName] !== undefined ? actualBalances[displayName] : null;
 
                   balances.push({
@@ -970,6 +989,7 @@ app.get('/api/banks/balances', async (req, res) => {
                      productName: bal.productName || null,
                      balance: bal.bookedBalance,
                      pendingBalance: bal.pendingBalance ?? 0,
+                     pendingTransactions,
                      actualBalance: actualBal,
                      currency: bal.currency || 'EUR',
                      bankName: bank.name,

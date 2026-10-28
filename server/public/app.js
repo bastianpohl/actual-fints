@@ -270,6 +270,23 @@ document.addEventListener('DOMContentLoaded', () => {
          status.style.display = 'none';
       }
    };
+   let lastBalances = [];
+   const openPendingDetail = (which) => {
+      const accs = (which === 'all' ? lastBalances : [lastBalances[which]]).filter(b => b?.pendingTransactions?.length);
+      const sum = (txs) => txs.reduce((a, t) => a + t.amount, 0);
+      runDetailTitle.textContent = `Vorgemerkte Buchungen · ${eur.format(sum(accs.flatMap(b => b.pendingTransactions)))}`;
+      runDetailBody.innerHTML = accs.map(b => `
+         <h3 class="run-section">${escapeHtml(b.name)} <span class="run-account-stats">${b.pendingTransactions.length} Buchungen · ${eur.format(sum(b.pendingTransactions))}</span></h3>
+         <table class="run-tx-table"><tbody>${b.pendingTransactions.map(t => `
+            <tr><td>${escapeHtml(formatDate(t.date))}</td>
+               <td title="${escapeHtml(t.purpose)}">${escapeHtml(t.payee || t.purpose)}</td>
+               <td class="amt ${t.amount < 0 ? 'debit' : 'credit'}">${eur.format(t.amount)}</td></tr>`).join('')}</tbody></table>`).join('');
+      runDetailModal.classList.add('show');
+   };
+   document.getElementById('balances-list').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-pending]');
+      if (b) openPendingDetail(b.dataset.pending);
+   });
    const renderBalances = (data) => {
       const list = document.getElementById('balances-list');
       {
@@ -282,7 +299,11 @@ document.addEventListener('DOMContentLoaded', () => {
                ? '<div style="font-size:0.8rem; color:var(--success);">Synchron</div>'
                : `<div style="font-size:0.8rem; color:var(--danger);">Actual: ${eur.format(b.actualBalance)} (Delta: ${delta > 0 ? '+' : ''}${eur.format(delta)})</div>`;
          };
-         const rows = data.balances.map(b => `
+         // Summe der einzelnen Vormerkungen; Fallback auf den Vormerk-Saldo der Bank, wenn sie nicht lieferbar waren
+         const pendingOf = (b) => b.pendingTransactions ? b.pendingTransactions.reduce((a, t) => a + t.amount, 0) : (b.pendingBalance || 0);
+         const pendingLink = (label, idx) => `<button type="button" class="link-btn" data-pending="${idx}" style="background:none; border:0; padding:0; font:inherit; color:inherit; text-decoration:underline dotted; cursor:pointer;">${label}</button>`;
+         lastBalances = data.balances;
+         const rows = data.balances.map((b, i) => `
             <div style="display:flex; justify-content:space-between; gap:1rem; padding:0.5rem 0; border-top:1px solid var(--card-border);">
                <div style="min-width:0;">
                   <div style="color:var(--text-primary); font-weight:600;">${escapeHtml(b.name)}</div>
@@ -290,15 +311,18 @@ document.addEventListener('DOMContentLoaded', () => {
                </div>
                <div style="text-align:right; white-space:nowrap;">
                   <div style="font-weight:700;">${money(b.balance)}</div>
-                  ${b.pendingBalance ? `<div style="font-size:0.8rem;">vorgemerkt: ${money(b.pendingBalance)}</div>` : ''}
+                  ${b.pendingTransactions?.length
+                     ? `<div style="font-size:0.8rem;">${pendingLink(`vorgemerkt: ${money(pendingOf(b))} (${b.pendingTransactions.length})`, i)}</div>`
+                     : pendingOf(b) ? `<div style="font-size:0.8rem;">vorgemerkt: ${money(pendingOf(b))}</div>` : ''}
                   ${sync(b)}
                </div>
             </div>`).join('');
          const total = data.balances.reduce((a, b) => a + b.balance, 0);
-         const pending = data.balances.reduce((a, b) => a + (b.pendingBalance || 0), 0);
+         const pending = data.balances.reduce((a, b) => a + pendingOf(b), 0);
+         const pendingCount = data.balances.reduce((a, b) => a + (b.pendingTransactions?.length || 0), 0);
          const errs = (data.errors || []).map(e => `<div style="color:var(--danger);">${escapeHtml(e.bankName)}: ${escapeHtml(e.error)}</div>`).join('');
          const stand = data.fetchedAt ? `<div data-snapshot style="font-size:0.8rem; margin-top:0.5rem;">Stand: ${new Date(data.fetchedAt).toLocaleString('de-DE')}</div>` : '';
-         list.innerHTML = (rows ? `<div style="margin-bottom:0.5rem;">Gesamt: <b>${money(total)}</b> · vorgemerkt: <b>${money(pending)}</b></div>${rows}` : 'Keine Konten.') + errs + stand;
+         list.innerHTML = (rows ? `<div style="margin-bottom:0.5rem;">Gesamt: <b>${money(total)}</b> · vorgemerkt: <b>${money(pending)}</b>${pendingCount ? ` (${pendingLink(`${pendingCount} Buchungen anzeigen`, 'all')})` : ''}</div>${rows}` : 'Keine Konten.') + errs + stand;
       }
    };
    // letzten Stand sofort zeigen, Aktualisierung läuft im Hintergrund
