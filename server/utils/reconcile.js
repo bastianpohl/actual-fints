@@ -134,7 +134,7 @@ const DAY_MS = 1000 * 60 * 60 * 24;
 
 /**
  * Sucht zu neu ignorierten Bankbuchungen die bereits abgeglichene Buchung, mit der sie
- * verwechselt wurden (gleiches Konto und Betrag, höchstens 7 Tage Abstand, ohne financial_id, egal ob abgestimmt).
+ * verwechselt wurden (gleiches Konto und Betrag, höchstens 7 Tage Abstand, ohne financial_id, egal ob abgestimmt oder Split-Unterposten).
  * Öffnet die Datenbank einmal für alle Buchungen.
  *
  * @param {string} dataDir Datenverzeichnis von Actual Budget.
@@ -151,7 +151,7 @@ function findReconciledMatches(dataDir, ignoredList, existingIds) {
    try {
       const stmt = db.prepare(`
          SELECT id, date, description AS payee, notes FROM transactions
-         WHERE acct = ? AND amount = ? AND financial_id IS NULL AND tombstone = 0 AND isChild = 0
+         WHERE acct = ? AND amount = ? AND financial_id IS NULL AND tombstone = 0
       `);
       const found = [];
       for (const { transaction: trans } of fresh) {

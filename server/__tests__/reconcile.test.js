@@ -17,14 +17,17 @@ test('findReconciledMatches: nächste abgeglichene Buchung innerhalb von 7 Tagen
   ins.run('near', 'a1', -1000, BigInt(20260927), 'p-near', 1, null); // 1 Tag Abstand, Integer-Datum wie in Actual
   ins.run('far', 'a1', -1000, '2026-09-20', 'p-far', 1, null);     // 8 Tage: außerhalb
   ins.run('bank', 'a1', -1000, '2026-09-28', 'p-bank', 1, 'fid');  // hat financial_id: kein Kandidat
+  db.prepare("INSERT INTO transactions VALUES ('child', 'a1', -1000, '2026-09-28', 'p-child', NULL, 0, NULL, 1, 0)").run(); // tombstone: kein Kandidat
+  db.prepare("INSERT INTO transactions VALUES ('split', 'a1', -3000, '2026-09-28', 'p-split', NULL, 1, NULL, 0, 1)").run(); // Split-Kind: Kandidat
   ins.run('other', 'a1', -2000, '2026-09-28', 'p-other', 1, null); // anderer Betrag
   db.close();
 
   const tx = (imported_id, amount) => ({ transaction: { imported_id, account: 'a1', amount, date: '2026-09-28' } });
-  const found = findReconciledMatches(dataDir, [tx('new', -1000), tx('known', -1000), tx('none', -5)], new Set(['known']));
+  const found = findReconciledMatches(dataDir, [tx('new', -1000), tx('known', -1000), tx('none', -5), tx('s', -3000)], new Set(['known']));
 
-  assert.equal(found.length, 1);
+  assert.equal(found.length, 2);
   assert.equal(found[0].bestMatch.id, 'near');
   assert.equal(found[0].diffDays, 1);
+  assert.equal(found[1].bestMatch.id, 'split');
   fs.rmSync(dataDir, { recursive: true });
 });
