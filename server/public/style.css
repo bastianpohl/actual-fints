@@ -1480,3 +1480,12 @@ button.run-chip:disabled { cursor: default; }
    .run-detail-chips select { margin-left: auto; }
    .run-detail-chips input { flex: 1 1 100%; }
 }
+
+/* Vormerkungen: markierbare Zeilen */
+.run-tx-table.pending-tx tr { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.run-tx-table.pending-tx tr.selected { background: color-mix(in srgb, var(--accent-secondary) 22%, transparent); box-shadow: inset 4px 0 0 var(--accent-secondary); }
+@media (max-width: 640px) {
+   .run-tx-table.pending-tx td { padding-top: 0.85rem; padding-bottom: 0.85rem; }
+   .run-tx-table.pending-tx tr td:first-child { padding-left: 0.6rem; }
+   .run-tx-table.pending-tx td:last-child { padding-right: 0.6rem; }
+}

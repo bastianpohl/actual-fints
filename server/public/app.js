@@ -272,17 +272,35 @@ document.addEventListener('DOMContentLoaded', () => {
    };
    let lastBalances = [];
    const openPendingDetail = (which) => {
-      const accs = (which === 'all' ? lastBalances : [lastBalances[which]]).filter(b => b?.pendingTransactions?.length);
+      // neueste zuerst (ISO-Datum, daher String-Vergleich)
+      const accs = (which === 'all' ? lastBalances : [lastBalances[which]]).filter(b => b?.pendingTransactions?.length)
+         .map(b => ({ ...b, pendingTransactions: [...b.pendingTransactions].sort((x, y) => y.date.localeCompare(x.date)) }));
       const sum = (txs) => txs.reduce((a, t) => a + t.amount, 0);
-      runDetailTitle.textContent = `Vorgemerkte Buchungen · ${eur.format(sum(accs.flatMap(b => b.pendingTransactions)))}`;
+      const total = eur.format(sum(accs.flatMap(b => b.pendingTransactions)));
+      const amounts = accs.flatMap(b => b.pendingTransactions.map(t => t.amount));
+      runDetailBody.dataset.amounts = JSON.stringify(amounts);
+      runDetailBody.dataset.total = total;
+      runDetailTitle.textContent = `Vorgemerkte Buchungen · ${total}`;
+      let n = 0;
       runDetailBody.innerHTML = accs.map(b => `
          <h3 class="run-section">${escapeHtml(b.name)} <span class="run-account-stats">${b.pendingTransactions.length} Buchungen · ${eur.format(sum(b.pendingTransactions))}</span></h3>
          <table class="run-tx-table pending-tx"><tbody>${b.pendingTransactions.map(t => `
-            <tr><td>${escapeHtml(formatDate(t.date))}</td>
+            <tr data-sel="${n++}"><td>${escapeHtml(formatDate(t.date))}</td>
                <td title="${escapeHtml(t.purpose)}">${escapeHtml(t.payee || t.purpose)}</td>
                <td class="amt ${t.amount < 0 ? 'debit' : 'credit'}">${eur.format(t.amount)}</td></tr>`).join('')}</tbody></table>`).join('');
       runDetailModal.classList.add('show');
    };
+   // Zeilen markieren: Summe der markierten Posten im Titel
+   runDetailBody.addEventListener('click', (e) => {
+      const tr = e.target.closest('tr[data-sel]');
+      if (!tr) return;
+      tr.classList.toggle('selected');
+      const amounts = JSON.parse(runDetailBody.dataset.amounts);
+      const picked = [...runDetailBody.querySelectorAll('tr.selected')].map(r => amounts[r.dataset.sel]);
+      runDetailTitle.textContent = picked.length
+         ? `Markiert (${picked.length}) · ${eur.format(picked.reduce((a, v) => a + v, 0))}`
+         : `Vorgemerkte Buchungen · ${runDetailBody.dataset.total}`;
+   });
    document.getElementById('balances-list').addEventListener('click', (e) => {
       const b = e.target.closest('[data-pending]');
       if (b) openPendingDetail(b.dataset.pending);
