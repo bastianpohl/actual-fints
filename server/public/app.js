@@ -272,9 +272,9 @@ document.addEventListener('DOMContentLoaded', () => {
    };
    let lastBalances = [];
    const openPendingDetail = (which) => {
-      // neueste zuerst (ISO-Datum, daher String-Vergleich)
+      // älteste zuerst (ISO-Datum, daher String-Vergleich)
       const accs = (which === 'all' ? lastBalances : [lastBalances[which]]).filter(b => b?.pendingTransactions?.length)
-         .map(b => ({ ...b, pendingTransactions: [...b.pendingTransactions].sort((x, y) => y.date.localeCompare(x.date)) }));
+         .map(b => ({ ...b, pendingTransactions: [...b.pendingTransactions].sort((x, y) => x.date.localeCompare(y.date)) }));
       const sum = (txs) => txs.reduce((a, t) => a + t.amount, 0);
       const total = eur.format(sum(accs.flatMap(b => b.pendingTransactions)));
       const amounts = accs.flatMap(b => b.pendingTransactions.map(t => t.amount));
