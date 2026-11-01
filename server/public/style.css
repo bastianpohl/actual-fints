@@ -1489,3 +1489,9 @@ button.run-chip:disabled { cursor: default; }
    .run-tx-table.pending-tx tr td:first-child { padding-left: 0.6rem; }
    .run-tx-table.pending-tx td:last-child { padding-right: 0.6rem; }
 }
+
+@media (max-width: 640px) {
+   /* Kontostände: Neuberechnungs-Hinweis unter den Titel statt daneben */
+   #balances-card .sync-header { flex-wrap: wrap; gap: 0.25rem; }
+   .balances-status { flex-basis: 100%; }
+}

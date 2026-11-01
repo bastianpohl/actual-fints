@@ -319,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
          };
          // Summe der einzelnen Vormerkungen; Fallback auf den Vormerk-Saldo der Bank, wenn sie nicht lieferbar waren
          const pendingOf = (b) => b.pendingTransactions ? b.pendingTransactions.reduce((a, t) => a + t.amount, 0) : (b.pendingBalance || 0);
-         const pendingLink = (label, idx) => `<button type="button" class="link-btn" data-pending="${idx}" style="background:none; border:0; padding:0; font:inherit; color:inherit; text-decoration:underline dotted; cursor:pointer;">${label}</button>`;
+         const pendingLink = (label, idx) => `<button type="button" class="link-btn" data-pending="${idx}" style="background:none; border:0; padding:0.3rem 0; font:inherit; color:inherit; text-decoration:underline dotted; cursor:pointer;">${label}</button>`;
          lastBalances = data.balances;
          const rows = data.balances.map((b, i) => `
             <div style="display:flex; justify-content:space-between; gap:1rem; padding:0.5rem 0; border-top:1px solid var(--card-border);">
@@ -340,7 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
          const pendingCount = data.balances.reduce((a, b) => a + (b.pendingTransactions?.length || 0), 0);
          const errs = (data.errors || []).map(e => `<div style="color:var(--danger);">${escapeHtml(e.bankName)}: ${escapeHtml(e.error)}</div>`).join('');
          const stand = data.fetchedAt ? `<div data-snapshot style="font-size:0.8rem; margin-top:0.5rem;">Stand: ${new Date(data.fetchedAt).toLocaleString('de-DE')}</div>` : '';
-         list.innerHTML = (rows ? `<div style="margin-bottom:0.5rem;">Gesamt: <b>${money(total)}</b> · vorgemerkt: <b>${money(pending)}</b>${pendingCount ? ` (${pendingLink(`${pendingCount} Buchungen anzeigen`, 'all')})` : ''}</div>${rows}` : 'Keine Konten.') + errs + stand;
+         list.innerHTML = (rows ? `<div style="margin-bottom:0.75rem; line-height:1.7;"><div>Gesamt: <b>${money(total)}</b></div><div>vorgemerkt: <b>${money(pending)}</b>${pendingCount ? ` · ${pendingLink(`${pendingCount} Buchungen anzeigen`, 'all')}` : ''}</div></div>${rows}` : 'Keine Konten.') + errs + stand;
       }
    };
    // letzten Stand sofort zeigen, Aktualisierung läuft im Hintergrund
