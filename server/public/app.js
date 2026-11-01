@@ -277,7 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
       runDetailTitle.textContent = `Vorgemerkte Buchungen · ${eur.format(sum(accs.flatMap(b => b.pendingTransactions)))}`;
       runDetailBody.innerHTML = accs.map(b => `
          <h3 class="run-section">${escapeHtml(b.name)} <span class="run-account-stats">${b.pendingTransactions.length} Buchungen · ${eur.format(sum(b.pendingTransactions))}</span></h3>
-         <table class="run-tx-table"><tbody>${b.pendingTransactions.map(t => `
+         <table class="run-tx-table pending-tx"><tbody>${b.pendingTransactions.map(t => `
             <tr><td>${escapeHtml(formatDate(t.date))}</td>
                <td title="${escapeHtml(t.purpose)}">${escapeHtml(t.payee || t.purpose)}</td>
                <td class="amt ${t.amount < 0 ? 'debit' : 'credit'}">${eur.format(t.amount)}</td></tr>`).join('')}</tbody></table>`).join('');

@@ -1411,6 +1411,12 @@ header {
    .run-tx-table tr:not(.ignored) td:first-child { box-shadow: inset 3px 0 0 var(--success); }
    .run-tx-table td { font-size: 0.78rem; }
 }
+@media (max-width: 640px) {
+   /* Vormerkungen: Betrag bleibt sichtbar (letzte Spalte), kein Import-Rand, Empfänger darf umbrechen */
+   .run-tx-table.pending-tx td:last-child { display: table-cell; padding-right: 0; font-weight: 600; }
+   .run-tx-table.pending-tx tr td:first-child { box-shadow: none; color: var(--text-muted); font-size: 0.72rem; padding-left: 0; }
+   .run-tx-table.pending-tx td:nth-child(2) { width: 100%; overflow-wrap: anywhere; line-height: 1.3; }
+}
 
 /* ── Lauf-Übersicht mobil: Karten statt Tabelle ──────────────────── */
 .run-kind { display: inline-flex; align-items: center; gap: 0.25rem; }
