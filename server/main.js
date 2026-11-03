@@ -7,6 +7,7 @@ const { CredentialsStore } = require('./lib/credentials-store');
 const api = require('@actual-app/api');
 const { findReconciledMatches, reconcileAccountIfSynchronized } = require('./utils/reconcile');
 const { maskIban } = require('./utils/mask');
+const { uniquifyIds } = require('./utils/uid');
 
 const parseDateRange = require('./utils/parseDateRange');
 const { sendSuccessNotification, sendFailureNotification, sendWarningNotification } = require('./utils/notifications');
@@ -108,7 +109,8 @@ const main = async () => {
 
             console.error('Verarbeite Konto:', maskIban(accountMapping.iban), '->', accountMapping.actualAccountName);
 
-            const transactions = await fintsClient.getTransaktions(startDate, endDate) || [];
+            const existingIds = await budgetClient.getExistingImportedIds();
+            const transactions = uniquifyIds(await fintsClient.getTransaktions(startDate, endDate) || [], existingIds);
             const budgetTransactions = transactions.map(t => budgetClient.convert(t));
 
             let added = 0;
@@ -117,8 +119,6 @@ const main = async () => {
             let warnings = [];
 
             if (budgetTransactions.length > 0) {
-               const existingIds = await budgetClient.getExistingImportedIds();
-               
                const importResult = await budgetClient.importTransactions(budgetTransactions);
                added = importResult?.added?.length ?? 0;
                updated = importResult?.updated?.length ?? 0;

@@ -99,18 +99,19 @@ class BudgetClient {
          const dbPath = getDatabasePath(this.#AB_PATH);
          if (!dbPath) {
             console.warn(`[budget-api] DB-Pfad konnte nicht ermittelt werden.`);
-            return new Set();
+            return new Map();
          }
          const db = new Database(dbPath);
          try {
-            const rows = db.prepare('SELECT financial_id FROM transactions WHERE acct = ? AND financial_id IS NOT NULL AND tombstone = 0').all(this.#activeAccount);
-            return new Set(rows.map(r => r.financial_id));
+            const rows = db.prepare('SELECT financial_id, COUNT(*) n FROM transactions WHERE acct = ? AND financial_id IS NOT NULL AND tombstone = 0 GROUP BY financial_id').all(this.#activeAccount);
+            // Map id -> how many bookings carry it (colliding ids exist); .has() works like a Set
+            return new Map(rows.map(r => [r.financial_id, r.n]));
          } finally {
             db.close();
          }
       } catch (error) {
          console.warn(`Failed to fetch existing transactions: ${error.message}`);
-         return new Set();
+         return new Map();
       }
    }
 
