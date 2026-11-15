@@ -18,7 +18,6 @@ const getNotes = transaction => {
 
    const parts = [];
 
-   if (text) parts.push(`#${decodeText(text).trim()}`);
    if (reference?.text) parts.push(decodeText(reference.text));
    if (iban) parts.push(`IBAN: ${iban}`);
    if (bic) parts.push(`BIC: ${bic}`);
@@ -29,6 +28,9 @@ const getNotes = transaction => {
 
    if (transaction.customerReference) parts.push(`CR: ${transaction.customerReference}`);
    if (transaction.bankReference) parts.push(`BR: ${transaction.bankReference}`);
+
+   // Zahlweg (Apple Pay, Lastschrift, Gutschrift, Entgelt …) als #Tag hinten anhängen
+   if (text) parts.push(`#${decodeText(text).trim()}`);
 
    const notes = parts.join(' ').replace(/\s+/g, ' ');
    return notes.slice(0, 2000);
