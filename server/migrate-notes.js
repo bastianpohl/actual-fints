@@ -23,11 +23,11 @@ const Database = require('better-sqlite3');
    await client.loadBudget();
 
    const db = new Database(getDatabasePath(cfg.dataDir), { readonly: true });
-   const rows = db.prepare("SELECT id, notes FROM transactions WHERE tombstone = 0 AND notes LIKE '#%'").all();
+   const rows = db.prepare("SELECT id, notes FROM transactions WHERE tombstone = 0 AND notes LIKE '%#%'").all();
    db.close();
 
    const changes = rows.map(r => ({ ...r, next: moveTagsToEnd(r.notes) })).filter(r => r.next !== r.notes);
-   console.log(`${rows.length} Buchungen mit führendem Tag, ${changes.length} werden umgestellt${apply ? '' : ' (Trockenlauf, --apply zum Schreiben)'}`);
+   console.log(`${rows.length} Buchungen mit Tag, ${changes.length} werden umgestellt${apply ? '' : ' (Trockenlauf, --apply zum Schreiben)'}`);
    for (const c of changes.slice(0, 15)) console.log(`  - ${c.notes.slice(0, 90)}\n  + ${c.next.slice(0, 90)}`);
 
    if (apply) {

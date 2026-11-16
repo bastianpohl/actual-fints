@@ -7,31 +7,36 @@ const PAYMENT_TAGS = new Set([
 const LEAD_RE = /^(?:#[^\s#]+\s*)+/;
 const TAIL_RE = /(?:\s+#[^\s#]+)+$/;
 
-// Verschiebt führende Zahlweg-Tags ans Ende der Notiz (historische Buchungen). Idempotent.
+// Zahlweg-Tags stehen hinten: erst Buchungstext (#Lastschrifteinzug), dann Bezahlart (#ApplePay, #Paypal).
+const LAST = new Set(['ApplePay', 'Paypal']);
+const isPay = t => PAYMENT_TAGS.has(t.slice(1));
+
+// Verschiebt führende Zahlweg-Tags ans Ende der Notiz und ordnet die End-Tags (historische Buchungen). Idempotent.
 const moveTagsToEnd = notes => {
    if (!notes) return notes;
    const lead = notes.match(LEAD_RE)?.[0] ?? '';
    const leadTags = lead.match(/#[^\s#]+/g) || [];
-   const moved = leadTags.filter(t => PAYMENT_TAGS.has(t.slice(1)));
-   if (!moved.length) return notes;
-
-   const keep = leadTags.filter(t => !PAYMENT_TAGS.has(t.slice(1)));
+   const moved = leadTags.filter(isPay);
+   const keep = leadTags.filter(t => !isPay(t));
    let rest = notes.slice(lead.length).trim();
 
    // "#Gutschrift aus Dauerauftrag": der Buchungstext hat Leerzeichen, der Rest gehört zum Tag
-   const text = /^aus Dauerauftrag\b/.test(rest) && moved.at(-1) === '#Gutschrift' ? ' aus Dauerauftrag' : '';
-   if (text) rest = rest.slice(text.length).trim();
-   moved[moved.length - 1] += text;
+   if (moved.length && /^aus Dauerauftrag\b/.test(rest) && moved.at(-1) === '#Gutschrift') {
+      moved[moved.length - 1] += ' aus Dauerauftrag';
+      rest = rest.slice('aus Dauerauftrag'.length).trim();
+   }
 
    // bereits angehängte Zahlweg-Tags am Ende übernehmen, nicht doppeln
-   const tail = rest.match(TAIL_RE)?.[0] ?? '';
-   const tailTags = (tail.match(/#[^\s#]+/g) || []);
-   const tailPayment = tailTags.filter(t => PAYMENT_TAGS.has(t.slice(1)));
-   if (tailPayment.length === tailTags.length && tailPayment.length) rest = rest.slice(0, rest.length - tail.length).trim();
-   else tailPayment.length = 0;
+   const tail = [];
+   for (let m; (m = rest.match(/(?:^|\s)(#[^\s#]+)$/)) && isPay(m[1]);) {
+      tail.unshift(m[1]);
+      rest = rest.slice(0, m.index).trim();
+   }
 
-   const tags = [...moved, ...tailPayment.filter(t => !moved.some(m => m.split(' ')[0] === t))];
-   return [keep.join(' '), rest, tags.join(' ')].filter(Boolean).join(' ');
+   const all = [...moved, ...tail].filter((t, i, a) => a.findIndex(x => x.split(' ')[0] === t.split(' ')[0]) === i);
+   if (!all.length) return notes;
+   all.sort((a, b) => LAST.has(a.slice(1)) - LAST.has(b.slice(1)));
+   return [keep.join(' '), rest, all.join(' ')].filter(Boolean).join(' ');
 };
 
 module.exports = { moveTagsToEnd, PAYMENT_TAGS };
